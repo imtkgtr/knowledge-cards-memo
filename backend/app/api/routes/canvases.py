@@ -7,6 +7,7 @@ from app.schemas.canvas import (
     CanvasSummaryResponse,
     CanvasSummarySchema,
     CreateCanvasRequest,
+    SaveCanvasDocumentRequest,
     UpdateCanvasRequest,
 )
 from app.services.canvas_service import CanvasService, get_canvas_service
@@ -74,4 +75,15 @@ def get_canvas_document(
     service: CanvasService = Depends(get_canvas_service),
 ) -> CanvasDocumentResponse:
     document = service.get_canvas_document(user, canvas_id)
+    return CanvasDocumentResponse(canvas=document)
+
+
+@router.put("/{canvas_id}/document", response_model=CanvasDocumentResponse)
+def save_canvas_document(
+    canvas_id: str,
+    payload: SaveCanvasDocumentRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+    service: CanvasService = Depends(get_canvas_service),
+) -> CanvasDocumentResponse:
+    document = service.save_canvas_document(user, canvas_id, payload)
     return CanvasDocumentResponse(canvas=document)

@@ -69,3 +69,17 @@
   一覧画面の import/export UI、キャンバス編集の React Flow shell、カード CRUD、保存は未実装。ログイン画面は Google ログイン未対応。
 - 次のアクション:
   次フェーズとして React Flow ベースの編集画面骨格と card CRUD を実装する。
+
+## 2026-04-20 02:31
+- 変更内容:
+  FastAPI に `PUT /api/canvases/{canvasId}/document` を追加し、カード配列とリンク配列を含む canvas document の保存処理とバリデーションを実装した。存在しないカード参照、重複リンク、階層循環、canvasId 不整合を拒否し、メモリ repository ベースのテストも追加した。
+- 目的:
+  フロントエンドの編集画面からカード配置や本文を保存できる API を先に用意し、React Flow ベースの editor shell を実装可能にするため。
+- 影響範囲:
+  `backend/`
+- 関連ファイル:
+  `backend/app/api/routes/canvases.py`、`backend/app/infrastructure/canvas_repository.py`、`backend/app/schemas/canvas.py`、`backend/app/services/canvas_service.py`、`backend/tests/test_canvases.py`
+- 未解決事項:
+  attachment を含む document 保存、差分保存、トランザクション保証付きの保存方式は未対応。
+- 次のアクション:
+  React Flow と Zustand を使った editor shell を追加し、card CRUD と手動保存をフロントエンドで通す。

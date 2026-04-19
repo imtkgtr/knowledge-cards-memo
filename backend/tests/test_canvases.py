@@ -75,3 +75,139 @@ def test_canvas_not_found() -> None:
 
     assert response.status_code == 404
     assert response.json()["detail"]["code"] == "canvas_not_found"
+
+
+def test_save_canvas_document() -> None:
+    context = build_test_context()
+    created = context.client.post("/api/canvases", json={"name": "保存テスト"}).json()["canvas"]
+    canvas_id = created["id"]
+
+    payload = {
+        "canvas": {
+            "id": canvas_id,
+            "name": "保存テスト",
+            "backgroundColor": "#faf7ef",
+            "gridEnabled": True,
+            "duplicateWarningSuppressed": False,
+            "createdAt": created["createdAt"],
+            "updatedAt": created["updatedAt"],
+        },
+        "cards": [
+            {
+                "id": "card-1",
+                "canvasId": canvas_id,
+                "title": "ノード 1",
+                "body": "本文",
+                "tagNames": ["history"],
+                "color": "#eed9b6",
+                "isLocked": False,
+                "x": 120,
+                "y": 180,
+                "childCount": 1,
+                "createdAt": created["createdAt"],
+                "updatedAt": created["updatedAt"],
+            },
+            {
+                "id": "card-2",
+                "canvasId": canvas_id,
+                "title": "ノード 2",
+                "body": "",
+                "tagNames": [],
+                "color": "#eed9b6",
+                "isLocked": False,
+                "x": 320,
+                "y": 180,
+                "childCount": 0,
+                "createdAt": created["createdAt"],
+                "updatedAt": created["updatedAt"],
+            },
+        ],
+        "hierarchyLinks": [
+            {
+                "id": "link-1",
+                "canvasId": canvas_id,
+                "parentCardId": "card-1",
+                "childCardId": "card-2",
+                "createdAt": created["createdAt"],
+            }
+        ],
+        "relatedLinks": [],
+        "attachments": [],
+    }
+
+    save_response = context.client.put(f"/api/canvases/{canvas_id}/document", json=payload)
+    assert save_response.status_code == 200
+    saved = save_response.json()["canvas"]
+    assert saved["canvas"]["gridEnabled"] is True
+    assert len(saved["cards"]) == 2
+    assert saved["cards"][0]["tagNames"] == ["history"]
+
+
+def test_save_canvas_document_rejects_cycles() -> None:
+    context = build_test_context()
+    created = context.client.post("/api/canvases", json={"name": "循環テスト"}).json()["canvas"]
+    canvas_id = created["id"]
+
+    payload = {
+        "canvas": {
+            "id": canvas_id,
+            "name": "循環テスト",
+            "backgroundColor": "#ffffff",
+            "gridEnabled": False,
+            "duplicateWarningSuppressed": False,
+            "createdAt": created["createdAt"],
+            "updatedAt": created["updatedAt"],
+        },
+        "cards": [
+            {
+                "id": "card-1",
+                "canvasId": canvas_id,
+                "title": "A",
+                "body": "",
+                "tagNames": [],
+                "color": "#eed9b6",
+                "isLocked": False,
+                "x": 0,
+                "y": 0,
+                "childCount": 1,
+                "createdAt": created["createdAt"],
+                "updatedAt": created["updatedAt"],
+            },
+            {
+                "id": "card-2",
+                "canvasId": canvas_id,
+                "title": "B",
+                "body": "",
+                "tagNames": [],
+                "color": "#eed9b6",
+                "isLocked": False,
+                "x": 100,
+                "y": 100,
+                "childCount": 1,
+                "createdAt": created["createdAt"],
+                "updatedAt": created["updatedAt"],
+            },
+        ],
+        "hierarchyLinks": [
+            {
+                "id": "link-1",
+                "canvasId": canvas_id,
+                "parentCardId": "card-1",
+                "childCardId": "card-2",
+                "createdAt": created["createdAt"],
+            },
+            {
+                "id": "link-2",
+                "canvasId": canvas_id,
+                "parentCardId": "card-2",
+                "childCardId": "card-1",
+                "createdAt": created["createdAt"],
+            },
+        ],
+        "relatedLinks": [],
+        "attachments": [],
+    }
+
+    save_response = context.client.put(f"/api/canvases/{canvas_id}/document", json=payload)
+    assert save_response.status_code == 422
+    assert save_response.json()["detail"]["code"] == "invalid_payload"

@@ -17,6 +17,7 @@ from app.schemas.canvas import (
     CardSchema,
     HierarchyLinkSchema,
     RelatedLinkSchema,
+    SaveCanvasDocumentRequest,
     UpdateCanvasRequest,
 )
 
@@ -40,6 +41,13 @@ class CanvasRepository(Protocol):
     def duplicate_canvas(self, user_id: str, canvas_id: str) -> CanvasSummarySchema | None: ...
 
     def get_canvas_document(self, user_id: str, canvas_id: str) -> CanvasDocumentSchema | None: ...
+
+    def save_canvas_document(
+        self,
+        user_id: str,
+        canvas_id: str,
+        payload: SaveCanvasDocumentRequest,
+    ) -> CanvasDocumentSchema | None: ...
 
 
 @dataclass(slots=True)
@@ -253,6 +261,76 @@ class SupabaseCanvasRepository:
             attachments=[AttachmentSchema.model_validate(row) for row in attachments],
         )
 
+    def save_canvas_document(
+        self,
+        user_id: str,
+        canvas_id: str,
+        payload: SaveCanvasDocumentRequest,
+    ) -> CanvasDocumentSchema | None:
+        canvas = self._get_canvas_row(user_id, canvas_id)
+        if canvas is None:
+            return None
+
+        self.client.table("canvases").update(
+            {
+                "name": payload.canvas.name.strip(),
+                "background_color": payload.canvas.background_color,
+                "grid_enabled": payload.canvas.grid_enabled,
+                "duplicate_warning_suppressed": payload.canvas.duplicate_warning_suppressed,
+            }
+        ).eq("id", canvas_id).eq("user_id", user_id).execute()
+
+        self.client.table("hierarchy_links").delete().eq("canvas_id", canvas_id).execute()
+        self.client.table("related_links").delete().eq("canvas_id", canvas_id).execute()
+        self.client.table("cards").delete().eq("canvas_id", canvas_id).execute()
+
+        if payload.cards:
+            self.client.table("cards").insert(
+                [
+                    {
+                        "id": card.id,
+                        "canvas_id": canvas_id,
+                        "title": card.title.strip(),
+                        "body": card.body,
+                        "tag_names": [tag.strip().lower() for tag in card.tag_names if tag.strip()],
+                        "color": card.color,
+                        "is_locked": card.is_locked,
+                        "x": card.x,
+                        "y": card.y,
+                        "child_count": card.child_count,
+                    }
+                    for card in payload.cards
+                ]
+            ).execute()
+
+        if payload.hierarchy_links:
+            self.client.table("hierarchy_links").insert(
+                [
+                    {
+                        "id": link.id,
+                        "canvas_id": canvas_id,
+                        "parent_card_id": link.parent_card_id,
+                        "child_card_id": link.child_card_id,
+                    }
+                    for link in payload.hierarchy_links
+                ]
+            ).execute()
+
+        if payload.related_links:
+            self.client.table("related_links").insert(
+                [
+                    {
+                        "id": link.id,
+                        "canvas_id": canvas_id,
+                        "card_a_id": min(link.card_a_id, link.card_b_id),
+                        "card_b_id": max(link.card_a_id, link.card_b_id),
+                    }
+                    for link in payload.related_links
+                ]
+            ).execute()
+
+        return self.get_canvas_document(user_id, canvas_id)
+
     def _get_canvas_row(self, user_id: str, canvas_id: str) -> dict | None:
         response = (
             self.client.table("canvases")
@@ -373,6 +451,25 @@ class MemoryCanvasRepository:
                 for item in self.attachments.get(canvas_id, [])
             ],
         )
+
+    def save_canvas_document(
+        self,
+        user_id: str,
+        canvas_id: str,
+        payload: SaveCanvasDocumentRequest,
+    ) -> CanvasDocumentSchema | None:
+        row = self.canvases.get(canvas_id)
+        if row is None or row["user_id"] != user_id:
+            return None
+        row["name"] = payload.canvas.name.strip()
+        row["background_color"] = payload.canvas.background_color
+        row["grid_enabled"] = payload.canvas.grid_enabled
+        row["duplicate_warning_suppressed"] = payload.canvas.duplicate_warning_suppressed
+        row["updated_at"] = datetime.now(tz=UTC)
+        self.cards[canvas_id] = [card.model_dump() for card in payload.cards]
+        self.hierarchy_links[canvas_id] = [link.model_dump() for link in payload.hierarchy_links]
+        self.related_links[canvas_id] = [link.model_dump() for link in payload.related_links]
+        return self.get_canvas_document(user_id, canvas_id)
 
 
 def build_memory_canvas_repository() -> MemoryCanvasRepository:

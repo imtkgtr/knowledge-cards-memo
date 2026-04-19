@@ -93,3 +93,11 @@ class CanvasResponse(CamelModel):
 
 class CanvasDocumentResponse(CamelModel):
     canvas: CanvasDocumentSchema
+
+
+class SaveCanvasDocumentRequest(CamelModel):
+    canvas: CanvasSchema
+    cards: list[CardSchema] = Field(default_factory=list)
+    hierarchy_links: list[HierarchyLinkSchema] = Field(default_factory=list)
+    related_links: list[RelatedLinkSchema] = Field(default_factory=list)
+    attachments: list[AttachmentSchema] = Field(default_factory=list)
