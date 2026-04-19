@@ -55,3 +55,17 @@
   document 保存 API、attachment API、JSON import/export API は未実装。複製時の添付複製も未対応。
 - 次のアクション:
   Supabase Auth と接続するフロントエンドのログイン導線、保護ルート、キャンバス一覧 UI を実装する。
+
+## 2026-04-20 02:31
+- 変更内容:
+  Next.js 側に Supabase SSR クライアント、proxy、ログイン画面、保護レイアウト、キャンバス一覧画面、キャンバス名モーダル、最低限の編集画面プレースホルダを追加した。フロントエンドからバックエンドの canvas API を呼ぶ helper と型定義も整備し、`bun run lint` と `bun run build` が通る状態にした。
+- 目的:
+  認証済み一覧導線までを通し、フェーズ 1 のフロントエンド実装を成立させるため。
+- 影響範囲:
+  `frontend/`
+- 関連ファイル:
+  `frontend/src/app/(public)/login/page.tsx`、`frontend/src/app/(app)/layout.tsx`、`frontend/src/app/(app)/canvases/page.tsx`、`frontend/src/app/(app)/canvases/[canvasId]/page.tsx`、`frontend/src/features/auth/components/login-form.tsx`、`frontend/src/features/canvas-list/components/canvas-list-page-client.tsx`、`frontend/src/lib/supabase/`、`frontend/src/lib/api/`、`frontend/package.json`、`frontend/bun.lock`
+- 未解決事項:
+  一覧画面の import/export UI、キャンバス編集の React Flow shell、カード CRUD、保存は未実装。ログイン画面は Google ログイン未対応。
+- 次のアクション:
+  次フェーズとして React Flow ベースの編集画面骨格と card CRUD を実装する。

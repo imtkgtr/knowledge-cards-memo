@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "web-app-standard",
-  description: "FastAPI + Next.js starter template",
+  title: "知識キャンバス",
+  description: "知識カードを空間に配置して構造を整理するワークスペース",
 };
 
 type RootLayoutProps = Readonly<{

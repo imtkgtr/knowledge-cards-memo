@@ -1,11 +1,19 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
-export default async function HomePage() {
+type ProtectedLayoutProps = Readonly<{
+  children: React.ReactNode;
+}>;
+
+export default async function ProtectedLayout({ children }: ProtectedLayoutProps) {
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  redirect(user ? "/canvases" : "/login");
+  if (!user) {
+    redirect("/login");
+  }
+
+  return children;
 }
