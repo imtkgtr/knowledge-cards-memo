@@ -83,3 +83,17 @@
   attachment を含む document 保存、差分保存、トランザクション保証付きの保存方式は未対応。
 - 次のアクション:
   React Flow と Zustand を使った editor shell を追加し、card CRUD と手動保存をフロントエンドで通す。
+
+## 2026-04-20 02:31
+- 変更内容:
+  フロントエンドに `@xyflow/react`、`zustand`、`immer` を導入し、React Flow ベースの editor shell、カード作成モーダル、カードノード、右詳細パネル、Zustand ストア、手動保存処理を追加した。キャンバス画面ではカード追加、ドラッグ移動、タイトル/本文/タグ/色の編集、保存 API 呼び出しまでを実装し、`bun run lint` と `bun run build` が通る状態にした。
+- 目的:
+  プレースホルダだった編集画面を実際に操作可能な状態へ進め、フェーズ 2/3 の起点となる card CRUD を通すため。
+- 影響範囲:
+  `frontend/`
+- 関連ファイル:
+  `frontend/src/app/(app)/canvases/[canvasId]/page.tsx`、`frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/features/canvas-editor/components/create-card-modal.tsx`、`frontend/src/features/canvas-editor/components/card-node.tsx`、`frontend/src/stores/use-canvas-editor-store.ts`、`frontend/src/lib/api/backend.ts`、`frontend/src/app/globals.css`、`frontend/package.json`、`frontend/bun.lock`
+- 未解決事項:
+  リンク追加 UI、ロック、複数選択、Undo/Redo、自動保存、検索、整列は未実装。カード作成位置は可視範囲中心の厳密計算ではなく簡易オフセット配置。
+- 次のアクション:
+  リンク追加モード、ロック、複数選択、Undo/Redo を editor shell 上へ順次追加する。

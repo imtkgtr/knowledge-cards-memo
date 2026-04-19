@@ -49,3 +49,28 @@ export async function serverFetchCanvasDocument(
   const payload = (await response.json()) as { canvas: CanvasDocument };
   return payload.canvas;
 }
+
+export async function clientSaveCanvasDocument(
+  accessToken: string,
+  canvasId: string,
+  document: CanvasDocument,
+): Promise<CanvasDocument> {
+  const response = await fetch(`${getBackendPublicUrl()}/api/canvases/${canvasId}/document`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(document),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      detail?: { message?: string };
+    } | null;
+    throw new Error(payload?.detail?.message ?? "キャンバスの保存に失敗しました。");
+  }
+
+  const payload = (await response.json()) as { canvas: CanvasDocument };
+  return payload.canvas;
+}
