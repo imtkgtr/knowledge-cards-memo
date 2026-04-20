@@ -20,6 +20,7 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("ja-JP", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "Asia/Tokyo",
   }).format(new Date(value));
 }
 
@@ -123,13 +124,13 @@ export function CanvasListPageClient({
     startTransition(async () => {
       try {
         if (modalState.mode === "create") {
-          const payload = (await request("/api/canvases", {
+          const payload = (await request("/canvases", {
             method: "POST",
             body: JSON.stringify({ name: value }),
           })) as { canvas: CanvasSummary };
           setCanvases((current) => [payload.canvas, ...current]);
         } else {
-          const payload = (await request(`/api/canvases/${modalState.canvas.id}`, {
+          const payload = (await request(`/canvases/${modalState.canvas.id}`, {
             method: "PATCH",
             body: JSON.stringify({ name: value }),
           })) as { canvas: CanvasSummary };
@@ -151,7 +152,7 @@ export function CanvasListPageClient({
     setSuccessMessage(null);
     startTransition(async () => {
       try {
-        const payload = (await request(`/api/canvases/${canvas.id}/duplicate`, {
+        const payload = (await request(`/canvases/${canvas.id}/duplicate`, {
           method: "POST",
         })) as { canvas: CanvasSummary };
         setCanvases((current) => [payload.canvas, ...current]);
@@ -170,7 +171,7 @@ export function CanvasListPageClient({
     setSuccessMessage(null);
     startTransition(async () => {
       try {
-        await request(`/api/canvases/${canvas.id}`, {
+        await request(`/canvases/${canvas.id}`, {
           method: "DELETE",
         });
         setCanvases((current) => current.filter((item) => item.id !== canvas.id));

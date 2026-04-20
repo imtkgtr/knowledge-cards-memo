@@ -223,3 +223,17 @@
   自動整列、添付は未実装。タグ操作にはまだ専用の UI テストがなく、今回は `bun run lint` と `bun run build` による確認に留まっている。
 - 次のアクション:
   このタグ機能をコミットして push し、その後は自動整列か添付機能のどちらかへ進む。
+
+## 2026-04-21 00:26
+- 変更内容:
+  キャンバス一覧の mutation 系 request パスから余分な `/api` 接頭辞を除去し、`/api/backend/api/canvases` へ飛んでいた二重化を修正した。あわせて一覧画面と編集画面の日時表示を `Asia/Tokyo` 固定にし、client component の SSR とブラウザ描画で日時テキストがずれにくいようにした。
+- 目的:
+  新規キャンバス作成が 404 になる不具合を修正し、一覧画面で出ていた hydration mismatch の要因になりうる日時フォーマット差を減らすため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-list/components/canvas-list-page-client.tsx`、`frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`progress.md`
+- 未解決事項:
+  シェルから取得したトークンでの直接 `curl` は 401 だったため、proxy 経路の最終確認はブラウザセッション前提で見る必要がある。hydrate mismatch が完全に解消したかは、一覧画面を再読み込みしてブラウザ側で再確認が必要。
+- 次のアクション:
+  今回の一覧修正をコミットして push し、ブラウザで新規作成と一覧再読み込みを再確認したうえで次機能へ進む。
