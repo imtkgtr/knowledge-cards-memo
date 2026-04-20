@@ -8,6 +8,7 @@ import {
   MiniMap,
   type NodeTypes,
   ReactFlow,
+  type ReactFlowInstance,
   useEdgesState,
   useNodesState,
 } from "@xyflow/react";
@@ -54,10 +55,14 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [canvasNameDraft, setCanvasNameDraft] = useState(initialDocument.canvas.name);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [tagsDraft, setTagsDraft] = useState("");
   const [titleDraft, setTitleDraft] = useState("");
+  const [reactFlowInstance, setReactFlowInstance] = useState<
+    ReactFlowInstance<KnowledgeCardNode, Edge> | null
+  >(null);
   const history = useCanvasEditorStore((state) => state.history);
   const historyIndex = useCanvasEditorStore((state) => state.historyIndex);
   const isDirty = useCanvasEditorStore((state) => state.isDirty);
@@ -157,6 +162,22 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       (document?.cards ?? []).some((card) => selectedCardIds.includes(card.id) && card.isLocked),
     [document?.cards, selectedCardIds],
   );
+  const searchResults = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return [];
+    }
+    return [...(document?.cards ?? [])]
+      .filter((card) => {
+        const title = card.title.toLowerCase();
+        const body = card.body.toLowerCase();
+        return title.includes(query) || body.includes(query);
+      })
+      .sort(
+        (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+      )
+      .slice(0, 10);
+  }, [document?.cards, searchQuery]);
   const canUndo = historyIndex >= 0;
   const canRedo = historyIndex < history.length - 1;
 
@@ -413,6 +434,19 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     }
   }
 
+  function handleSearchResultClick(cardId: string) {
+    const card = document?.cards.find((item) => item.id === cardId);
+    if (!card || !reactFlowInstance) {
+      return;
+    }
+    reactFlowInstance.setCenter(card.x + 120, card.y + 80, {
+      duration: 400,
+      zoom: Math.max(reactFlowInstance.getZoom(), 0.95),
+    });
+    setSearchQuery("");
+    setInteractionMessage(`「${card.title}」の位置へ移動しました。`);
+  }
+
   return (
     <main className="editor-shell">
       <header className="editor-topbar">
@@ -436,6 +470,33 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           </p>
         </div>
         <div className="editor-topbar__actions">
+          <div className="search-panel">
+            <input
+              className="input search-panel__input"
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="タイトル・本文を検索"
+              value={searchQuery}
+            />
+            {searchQuery.trim() ? (
+              <div className="search-panel__results">
+                {searchResults.length > 0 ? (
+                  searchResults.map((card) => (
+                    <button
+                      className="search-result"
+                      key={card.id}
+                      onClick={() => handleSearchResultClick(card.id)}
+                      type="button"
+                    >
+                      <strong>{card.title}</strong>
+                      <span>{card.body.slice(0, 80) || "本文なし"}</span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="muted search-panel__empty">一致するカードはありません。</p>
+                )}
+              </div>
+            ) : null}
+          </div>
           <button className="button button--ghost" disabled={!canUndo} onClick={undo} type="button">
             Undo
           </button>
@@ -559,12 +620,13 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         </aside>
 
         <div className="editor-canvas">
-          <ReactFlow
+          <ReactFlow<KnowledgeCardNode, Edge>
             edges={edges}
             fitView
             multiSelectionKeyCode={["Meta", "Control", "Shift"]}
             nodeTypes={nodeTypes}
             nodes={nodes}
+            onInit={setReactFlowInstance}
             onEdgeClick={(_, edge) => {
               if (edge.data?.kind === "hierarchy") {
                 removeHierarchyLink(edge.id);

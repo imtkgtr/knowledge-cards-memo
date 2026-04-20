@@ -167,3 +167,17 @@
   いま接続している hosted Supabase 側には `public.profiles` などのテーブルがまだ存在せず、migration を適用しない限り新規キャンバス作成は成功しない。これはアプリコードではなく接続先 DB の初期化状態の問題。
 - 次のアクション:
   今回の backend 修正をコミットして push し、引き続き検索や JSON 入出力などコード側で進められる機能実装を進行する。remote DB へ migration を流せる手段が用意できたら、その時点で新規作成の実動作確認を再開する。
+
+## 2026-04-20 22:31
+- 変更内容:
+  編集画面の top bar に検索入力と検索結果ポップオーバーを追加した。検索対象はカードのタイトルと本文で、結果は更新日時降順で表示し、クリックするとカード位置へカメラを移動するようにした。選択状態や右パネルは変更しない。
+- 目的:
+  仕様で定義されている「見に行く導線」としての検索を先に成立させ、remote DB 初期化待ちの間も UI 実装を前に進めるため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/app/globals.css`、`progress.md`
+- 未解決事項:
+  タグ強調 / タグ絞り込み、JSON import/export、整列、添付は未実装。新規キャンバス作成は依然として接続先 Supabase の migration 未適用が blocker。
+- 次のアクション:
+  検索機能をコミットし、次は JSON import/export かタグ強調 / 絞り込みのどちらかを実装する。
