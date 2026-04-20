@@ -153,3 +153,17 @@
   自動保存失敗時の再試行戦略、保存中のトースト UI、タブ離脱時警告、JSON import/export、検索、整列、添付は未実装。
 - 次のアクション:
   autosave をコミットして push し、その後は検索または JSON import/export のどちらかを次フェーズとして着手する。
+
+## 2026-04-20 22:15
+- 変更内容:
+  Supabase Auth の access token 検証を `HS256` 固定から、共有 secret と JWKS 公開鍵の両対応へ修正した。あわせて、接続先 Supabase プロジェクトに `profiles` などのテーブルが無い場合は `storage_not_initialized` を返すようにし、ホスト側 DB 未初期化が UI からも判別できるようにした。認証ユニットテストと storage 初期化エラーテストも追加した。
+- 目的:
+  ログイン済みでも変異系 API が `認証トークンが不正です` で失敗していた問題を解消し、次に残る blocker が remote Supabase の migration 未適用であることを切り分けるため。
+- 影響範囲:
+  `backend/`、`progress.md`
+- 関連ファイル:
+  `backend/app/core/auth.py`、`backend/app/services/canvas_service.py`、`backend/tests/test_auth.py`、`backend/tests/test_canvas_service.py`、`progress.md`
+- 未解決事項:
+  いま接続している hosted Supabase 側には `public.profiles` などのテーブルがまだ存在せず、migration を適用しない限り新規キャンバス作成は成功しない。これはアプリコードではなく接続先 DB の初期化状態の問題。
+- 次のアクション:
+  今回の backend 修正をコミットして push し、引き続き検索や JSON 入出力などコード側で進められる機能実装を進行する。remote DB へ migration を流せる手段が用意できたら、その時点で新規作成の実動作確認を再開する。

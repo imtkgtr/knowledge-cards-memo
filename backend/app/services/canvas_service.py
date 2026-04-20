@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fastapi import Depends, HTTPException, status
+from postgrest.exceptions import APIError
 
 from app.core.auth import AuthenticatedUser, get_current_user
 from app.infrastructure.canvas_repository import CanvasRepository, get_canvas_repository
@@ -20,12 +21,20 @@ class CanvasService:
     repository: CanvasRepository
 
     def list_canvases(self, user: AuthenticatedUser) -> list[CanvasSummarySchema]:
-        self.repository.ensure_profile(user.id, user.email)
-        return self.repository.list_canvases(user.id)
+        return self._with_storage_guard(
+            lambda: self._prepare_profile_and_run(
+                user,
+                lambda: self.repository.list_canvases(user.id),
+            )
+        )
 
     def create_canvas(self, user: AuthenticatedUser, name: str) -> CanvasSummarySchema:
-        self.repository.ensure_profile(user.id, user.email)
-        return self.repository.create_canvas(user.id, name)
+        return self._with_storage_guard(
+            lambda: self._prepare_profile_and_run(
+                user,
+                lambda: self.repository.create_canvas(user.id, name),
+            )
+        )
 
     def update_canvas(
         self,
@@ -33,27 +42,44 @@ class CanvasService:
         canvas_id: str,
         payload: UpdateCanvasRequest,
     ) -> CanvasSchema:
-        self.repository.ensure_profile(user.id, user.email)
-        updated = self.repository.update_canvas(user.id, canvas_id, payload)
+        updated = self._with_storage_guard(
+            lambda: self._prepare_profile_and_run(
+                user,
+                lambda: self.repository.update_canvas(user.id, canvas_id, payload),
+            )
+        )
         if updated is None:
             raise self._not_found()
         return updated
 
     def delete_canvas(self, user: AuthenticatedUser, canvas_id: str) -> None:
-        self.repository.ensure_profile(user.id, user.email)
-        if not self.repository.delete_canvas(user.id, canvas_id):
+        deleted = self._with_storage_guard(
+            lambda: self._prepare_profile_and_run(
+                user,
+                lambda: self.repository.delete_canvas(user.id, canvas_id),
+            )
+        )
+        if not deleted:
             raise self._not_found()
 
     def duplicate_canvas(self, user: AuthenticatedUser, canvas_id: str) -> CanvasSummarySchema:
-        self.repository.ensure_profile(user.id, user.email)
-        duplicated = self.repository.duplicate_canvas(user.id, canvas_id)
+        duplicated = self._with_storage_guard(
+            lambda: self._prepare_profile_and_run(
+                user,
+                lambda: self.repository.duplicate_canvas(user.id, canvas_id),
+            )
+        )
         if duplicated is None:
             raise self._not_found()
         return duplicated
 
     def get_canvas_document(self, user: AuthenticatedUser, canvas_id: str) -> CanvasDocumentSchema:
-        self.repository.ensure_profile(user.id, user.email)
-        document = self.repository.get_canvas_document(user.id, canvas_id)
+        document = self._with_storage_guard(
+            lambda: self._prepare_profile_and_run(
+                user,
+                lambda: self.repository.get_canvas_document(user.id, canvas_id),
+            )
+        )
         if document is None:
             raise self._not_found()
         return document
@@ -64,12 +90,35 @@ class CanvasService:
         canvas_id: str,
         payload: SaveCanvasDocumentRequest,
     ) -> CanvasDocumentSchema:
-        self.repository.ensure_profile(user.id, user.email)
         self._validate_document(canvas_id, payload)
-        document = self.repository.save_canvas_document(user.id, canvas_id, payload)
+        document = self._with_storage_guard(
+            lambda: self._prepare_profile_and_run(
+                user,
+                lambda: self.repository.save_canvas_document(user.id, canvas_id, payload),
+            )
+        )
         if document is None:
             raise self._not_found()
         return document
+
+    def _prepare_profile_and_run(self, user: AuthenticatedUser, callback):
+        self.repository.ensure_profile(user.id, user.email)
+        return callback()
+
+    @staticmethod
+    def _with_storage_guard(callback):
+        try:
+            return callback()
+        except APIError as error:
+            if error.code == "PGRST205":
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail={
+                        "code": "storage_not_initialized",
+                        "message": "Supabase のテーブルが未初期化です。migration を適用してください。",
+                    },
+                ) from error
+            raise
 
     def _validate_document(self, canvas_id: str, payload: SaveCanvasDocumentRequest) -> None:
         if payload.canvas.id != canvas_id:
