@@ -51,6 +51,8 @@ function parseTags(value: string) {
 
 export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClientProps) {
   const supabase = createBrowserSupabaseClient();
+  const [activeHighlightTag, setActiveHighlightTag] = useState<string | null>(null);
+  const [activeFilterTag, setActiveFilterTag] = useState<string | null>(null);
   const [bodyDraft, setBodyDraft] = useState("");
   const [canvasNameDraft, setCanvasNameDraft] = useState(initialDocument.canvas.name);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -101,9 +103,31 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     loadDocument(initialDocument);
   }, [initialDocument, loadDocument]);
 
+  const availableTags = useMemo(
+    () =>
+      Array.from(
+        new Set((document?.cards ?? []).flatMap((card) => card.tagNames.map((tag) => tag.trim()))),
+      )
+        .filter(Boolean)
+        .sort((left, right) => left.localeCompare(right, "ja")),
+    [document?.cards],
+  );
+
+  const visibleCards = useMemo(
+    () =>
+      activeFilterTag
+        ? (document?.cards ?? []).filter((card) => card.tagNames.includes(activeFilterTag))
+        : (document?.cards ?? []),
+    [activeFilterTag, document?.cards],
+  );
+  const visibleCardIds = useMemo(
+    () => new Set(visibleCards.map((card) => card.id)),
+    [visibleCards],
+  );
+
   const nodesFromDocument = useMemo<KnowledgeCardNode[]>(
     () =>
-      (document?.cards ?? []).map((card) => ({
+      visibleCards.map((card) => ({
         id: card.id,
         type: "knowledgeCard",
         position: { x: card.x, y: card.y },
@@ -112,34 +136,43 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         data: {
           title: card.title,
           color: card.color,
+          isHighlighted: Boolean(activeHighlightTag && card.tagNames.includes(activeHighlightTag)),
+          isDimmed: Boolean(activeHighlightTag && !card.tagNames.includes(activeHighlightTag)),
           isLocked: card.isLocked,
           childCount: card.childCount,
+          tagSummary: card.tagNames.slice(0, 2).join(", "),
         },
       })),
-    [document?.cards],
+    [activeHighlightTag, visibleCards],
   );
 
   const edgesFromDocument = useMemo<Edge[]>(
     () => [
-      ...((document?.hierarchyLinks ?? []).map((link) => ({
-        id: link.id,
-        source: link.parentCardId,
-        target: link.childCardId,
-        type: "smoothstep",
-        markerEnd: { type: MarkerType.ArrowClosed },
-        style: { strokeWidth: 2 },
-        data: { kind: "hierarchy" },
-      })) satisfies Edge[]),
-      ...((document?.relatedLinks ?? []).map((link) => ({
-        id: link.id,
-        source: link.cardAId,
-        target: link.cardBId,
-        type: "default",
-        style: { strokeDasharray: "6 4", strokeWidth: 2 },
-        data: { kind: "related" },
-      })) satisfies Edge[]),
+      ...((document?.hierarchyLinks ?? [])
+        .filter(
+          (link) => visibleCardIds.has(link.parentCardId) && visibleCardIds.has(link.childCardId),
+        )
+        .map((link) => ({
+          id: link.id,
+          source: link.parentCardId,
+          target: link.childCardId,
+          type: "smoothstep",
+          markerEnd: { type: MarkerType.ArrowClosed },
+          style: { strokeWidth: 2 },
+          data: { kind: "hierarchy" },
+        })) satisfies Edge[]),
+      ...((document?.relatedLinks ?? [])
+        .filter((link) => visibleCardIds.has(link.cardAId) && visibleCardIds.has(link.cardBId))
+        .map((link) => ({
+          id: link.id,
+          source: link.cardAId,
+          target: link.cardBId,
+          type: "default",
+          style: { strokeDasharray: "6 4", strokeWidth: 2 },
+          data: { kind: "related" },
+        })) satisfies Edge[]),
     ],
-    [document?.hierarchyLinks, document?.relatedLinks],
+    [document?.hierarchyLinks, document?.relatedLinks, visibleCardIds],
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(nodesFromDocument);
@@ -191,6 +224,36 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     setBodyDraft(selectedCard?.body ?? "");
     setTagsDraft(selectedCard?.tagNames.join(", ") ?? "");
   }, [selectedCard?.body, selectedCard?.tagNames, selectedCard?.title]);
+
+  useEffect(() => {
+    if (activeFilterTag && !availableTags.includes(activeFilterTag)) {
+      setActiveFilterTag(null);
+    }
+    if (activeHighlightTag && !availableTags.includes(activeHighlightTag)) {
+      setActiveHighlightTag(null);
+    }
+  }, [activeFilterTag, activeHighlightTag, availableTags]);
+
+  useEffect(() => {
+    if (!activeFilterTag) {
+      return;
+    }
+
+    const nextSelectedIds = selectedCardIds.filter((cardId) => visibleCardIds.has(cardId));
+    if (nextSelectedIds.length !== selectedCardIds.length) {
+      setSelectedCardIds(nextSelectedIds);
+    }
+    if (selectedCardId && !visibleCardIds.has(selectedCardId)) {
+      selectCard(null);
+    }
+  }, [
+    activeFilterTag,
+    selectCard,
+    selectedCardId,
+    selectedCardIds,
+    setSelectedCardIds,
+    visibleCardIds,
+  ]);
 
   const commitCanvasName = useEffectEvent((value: string) => {
     const currentName = document?.canvas.name ?? "";
@@ -617,6 +680,50 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                 type="button"
               />
             ))}
+          </div>
+          <div className="editor-palette__section">
+            <p className="muted">タグ強調</p>
+            <div className="tag-chip-list">
+              <button
+                className={!activeHighlightTag ? "tag-chip tag-chip--active" : "tag-chip"}
+                onClick={() => setActiveHighlightTag(null)}
+                type="button"
+              >
+                なし
+              </button>
+              {availableTags.map((tag) => (
+                <button
+                  className={activeHighlightTag === tag ? "tag-chip tag-chip--active" : "tag-chip"}
+                  key={`highlight-${tag}`}
+                  onClick={() => setActiveHighlightTag((current) => (current === tag ? null : tag))}
+                  type="button"
+                >
+                  #{tag}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="editor-palette__section">
+            <p className="muted">タグ絞り込み</p>
+            <div className="tag-chip-list">
+              <button
+                className={!activeFilterTag ? "tag-chip tag-chip--active" : "tag-chip"}
+                onClick={() => setActiveFilterTag(null)}
+                type="button"
+              >
+                すべて
+              </button>
+              {availableTags.map((tag) => (
+                <button
+                  className={activeFilterTag === tag ? "tag-chip tag-chip--active" : "tag-chip"}
+                  key={`filter-${tag}`}
+                  onClick={() => setActiveFilterTag((current) => (current === tag ? null : tag))}
+                  type="button"
+                >
+                  #{tag}
+                </button>
+              ))}
+            </div>
           </div>
         </aside>
 

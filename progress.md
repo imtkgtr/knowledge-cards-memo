@@ -209,3 +209,17 @@
   タグ強調 / 絞り込み、整列、添付は未実装。JSON インポートは最小 shape 確認をフロントに入れているが、本格的な schema プレビューや dry-run は未対応。
 - 次のアクション:
   JSON 入出力をコミットして push し、その後はタグ強調 / 絞り込みか自動整列のどちらかへ進む。
+
+## 2026-04-21 00:08
+- 変更内容:
+  編集画面の左パレットに `タグ強調` と `タグ絞り込み` を追加した。タグ強調では一致カードを強調し、それ以外を減衰表示する。タグ絞り込みでは一致カードとその間のリンクだけを表示する。絞り込みで非表示になった選択状態は自動的に解除するようにした。
+- 目的:
+  検索とは別に、同じタグを持つカード群を視覚的に追いやすくし、仕様で要求されているタグ操作を MVP に取り込むため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/features/canvas-editor/components/card-node.tsx`、`frontend/src/app/globals.css`、`progress.md`
+- 未解決事項:
+  自動整列、添付は未実装。タグ操作にはまだ専用の UI テストがなく、今回は `bun run lint` と `bun run build` による確認に留まっている。
+- 次のアクション:
+  このタグ機能をコミットして push し、その後は自動整列か添付機能のどちらかへ進む。
