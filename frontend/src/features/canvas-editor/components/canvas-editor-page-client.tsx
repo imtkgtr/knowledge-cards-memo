@@ -60,9 +60,10 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [isPending, startTransition] = useTransition();
   const [tagsDraft, setTagsDraft] = useState("");
   const [titleDraft, setTitleDraft] = useState("");
-  const [reactFlowInstance, setReactFlowInstance] = useState<
-    ReactFlowInstance<KnowledgeCardNode, Edge> | null
-  >(null);
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<
+    KnowledgeCardNode,
+    Edge
+  > | null>(null);
   const history = useCanvasEditorStore((state) => state.history);
   const historyIndex = useCanvasEditorStore((state) => state.historyIndex);
   const isDirty = useCanvasEditorStore((state) => state.isDirty);

@@ -181,3 +181,17 @@
   タグ強調 / タグ絞り込み、JSON import/export、整列、添付は未実装。新規キャンバス作成は依然として接続先 Supabase の migration 未適用が blocker。
 - 次のアクション:
   検索機能をコミットし、次は JSON import/export かタグ強調 / 絞り込みのどちらかを実装する。
+
+## 2026-04-20 23:12
+- 変更内容:
+  編集画面で新規作成するカードとリンクの ID 生成を、接頭辞付き文字列から純粋な UUID に変更した。これにより、`uuid` 型で定義している Supabase テーブルへそのまま保存できるようにした。
+- 目的:
+  migration 適用済みの hosted Supabase へ接続した実環境で、カード追加後の document 保存が ID 型不一致で失敗する問題を防ぐため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/stores/use-canvas-editor-store.ts`、`frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`progress.md`
+- 未解決事項:
+  JSON import/export、タグ強調 / 絞り込み、整列、添付は未実装。新規キャンバス作成の blocker だった migration 未適用は解消したため、今後は保存を含む実環境操作で UI 起因の不整合を順次潰す必要がある。
+- 次のアクション:
+  今回の UUID 互換修正をコミットして push し、その後は JSON import/export の API と UI を実装する。

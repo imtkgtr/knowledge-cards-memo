@@ -57,8 +57,8 @@ function getNow() {
   return new Date().toISOString();
 }
 
-function randomId(prefix: string) {
-  return `${prefix}-${crypto.randomUUID()}`;
+function randomUuid() {
+  return crypto.randomUUID();
 }
 
 function sortedPair(left: string, right: string) {
@@ -202,7 +202,7 @@ export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
             return;
           }
           draft.hierarchyLinks.push({
-            id: randomId("hierarchy"),
+            id: randomUuid(),
             canvasId: draft.canvas.id,
             parentCardId,
             childCardId,
@@ -234,7 +234,7 @@ export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
             return;
           }
           draft.relatedLinks.push({
-            id: randomId("related"),
+            id: randomUuid(),
             canvasId: draft.canvas.id,
             cardAId: left,
             cardBId: right,
@@ -297,7 +297,7 @@ export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
       });
     },
     createCard: ({ body = "", title, x, y }) => {
-      const cardId = randomId("card");
+      const cardId = randomUuid();
       const now = getNow();
       const didCreate = updateDocument("カード追加", (draft) => {
         draft.cards.push({
