@@ -211,3 +211,155 @@ def test_save_canvas_document_rejects_cycles() -> None:
     save_response = context.client.put(f"/api/canvases/{canvas_id}/document", json=payload)
     assert save_response.status_code == 422
     assert save_response.json()["detail"]["code"] == "invalid_payload"
+
+
+def test_export_canvas_document() -> None:
+    context = build_test_context()
+    created = context.client.post("/api/canvases", json={"name": "書き出しテスト"}).json()["canvas"]
+    canvas_id = created["id"]
+
+    context.client.put(
+        f"/api/canvases/{canvas_id}/document",
+        json={
+            "canvas": {
+                "id": canvas_id,
+                "name": "書き出しテスト",
+                "backgroundColor": "#faf7ef",
+                "gridEnabled": True,
+                "duplicateWarningSuppressed": False,
+                "createdAt": created["createdAt"],
+                "updatedAt": created["updatedAt"],
+            },
+            "cards": [
+                {
+                    "id": "card-1",
+                    "canvasId": canvas_id,
+                    "title": "ノード 1",
+                    "body": "本文",
+                    "tagNames": ["history"],
+                    "color": "#eed9b6",
+                    "isLocked": False,
+                    "x": 10,
+                    "y": 20,
+                    "childCount": 0,
+                    "createdAt": created["createdAt"],
+                    "updatedAt": created["updatedAt"],
+                }
+            ],
+            "hierarchyLinks": [],
+            "relatedLinks": [],
+            "attachments": [],
+        },
+    )
+
+    export_response = context.client.get(f"/api/canvases/{canvas_id}/export")
+
+    assert export_response.status_code == 200
+    exported = export_response.json()
+    assert exported["version"] == "1.0"
+    assert exported["canvas"]["name"] == "書き出しテスト"
+    assert len(exported["cards"]) == 1
+    assert "attachments" not in exported
+
+
+def test_import_canvas_creates_new_canvas_with_remapped_ids() -> None:
+    context = build_test_context()
+
+    import_response = context.client.post(
+        "/api/canvases/import",
+        json={
+            "payload": {
+                "version": "1.0",
+                "canvas": {
+                    "id": "source-canvas",
+                    "name": "インポート元",
+                    "backgroundColor": "#faf7ef",
+                    "gridEnabled": True,
+                    "duplicateWarningSuppressed": False,
+                    "createdAt": "2026-04-20T00:00:00Z",
+                    "updatedAt": "2026-04-20T00:00:00Z",
+                },
+                "cards": [
+                    {
+                        "id": "source-card-1",
+                        "canvasId": "source-canvas",
+                        "title": "ノード 1",
+                        "body": "本文 1",
+                        "tagNames": ["history"],
+                        "color": "#eed9b6",
+                        "isLocked": False,
+                        "x": 10,
+                        "y": 20,
+                        "childCount": 1,
+                        "createdAt": "2026-04-20T00:00:00Z",
+                        "updatedAt": "2026-04-20T00:00:00Z",
+                    },
+                    {
+                        "id": "source-card-2",
+                        "canvasId": "source-canvas",
+                        "title": "ノード 2",
+                        "body": "本文 2",
+                        "tagNames": [],
+                        "color": "#cfe8ff",
+                        "isLocked": False,
+                        "x": 110,
+                        "y": 120,
+                        "childCount": 0,
+                        "createdAt": "2026-04-20T00:00:00Z",
+                        "updatedAt": "2026-04-20T00:00:00Z",
+                    },
+                ],
+                "hierarchyLinks": [
+                    {
+                        "id": "source-link-1",
+                        "canvasId": "source-canvas",
+                        "parentCardId": "source-card-1",
+                        "childCardId": "source-card-2",
+                        "createdAt": "2026-04-20T00:00:00Z",
+                    }
+                ],
+                "relatedLinks": [],
+            }
+        },
+    )
+
+    assert import_response.status_code == 201
+    imported = import_response.json()["canvas"]
+    assert imported["name"] == "インポート元"
+
+    document_response = context.client.get(f"/api/canvases/{imported['id']}/document")
+    assert document_response.status_code == 200
+    document = document_response.json()["canvas"]
+    assert len(document["cards"]) == 2
+    assert len(document["hierarchyLinks"]) == 1
+    assert {card["id"] for card in document["cards"]} != {"source-card-1", "source-card-2"}
+    assert all(card["canvasId"] == imported["id"] for card in document["cards"])
+
+
+def test_import_canvas_rejects_attachments() -> None:
+    context = build_test_context()
+
+    import_response = context.client.post(
+        "/api/canvases/import",
+        json={
+            "payload": {
+                "version": "1.0",
+                "canvas": {
+                    "id": "source-canvas",
+                    "name": "添付付き",
+                    "backgroundColor": "#ffffff",
+                    "gridEnabled": False,
+                    "duplicateWarningSuppressed": False,
+                    "createdAt": "2026-04-20T00:00:00Z",
+                    "updatedAt": "2026-04-20T00:00:00Z",
+                },
+                "cards": [],
+                "hierarchyLinks": [],
+                "relatedLinks": [],
+                "attachments": [],
+            }
+        },
+    )
+
+    assert import_response.status_code == 422
+    assert import_response.json()["detail"]["code"] == "invalid_payload"

@@ -1,4 +1,4 @@
-import type { CanvasDocument, CanvasSummary } from "./types";
+import type { CanvasDocument, CanvasExportPayload, CanvasSummary } from "./types";
 
 const browserProxyBasePath = "/api/backend";
 
@@ -79,4 +79,48 @@ export async function clientSaveCanvasDocument(
 
   const payload = (await response.json()) as { canvas: CanvasDocument };
   return payload.canvas;
+}
+
+export async function clientExportCanvas(
+  accessToken: string,
+  canvasId: string,
+): Promise<CanvasExportPayload> {
+  const response = await fetch(getBrowserProxyPath(`/canvases/${canvasId}/export`), {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      detail?: { message?: string };
+    } | null;
+    throw new Error(payload?.detail?.message ?? "JSON の書き出しに失敗しました。");
+  }
+
+  return (await response.json()) as CanvasExportPayload;
+}
+
+export async function clientImportCanvas(
+  accessToken: string,
+  payload: CanvasExportPayload,
+): Promise<CanvasSummary> {
+  const response = await fetch(getBrowserProxyPath("/canvases/import"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ payload }),
+  });
+
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => null)) as {
+      detail?: { message?: string };
+    } | null;
+    throw new Error(errorPayload?.detail?.message ?? "JSON のインポートに失敗しました。");
+  }
+
+  const data = (await response.json()) as { canvas: CanvasSummary };
+  return data.canvas;
 }

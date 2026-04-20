@@ -195,3 +195,17 @@
   JSON import/export、タグ強調 / 絞り込み、整列、添付は未実装。新規キャンバス作成の blocker だった migration 未適用は解消したため、今後は保存を含む実環境操作で UI 起因の不整合を順次潰す必要がある。
 - 次のアクション:
   今回の UUID 互換修正をコミットして push し、その後は JSON import/export の API と UI を実装する。
+
+## 2026-04-20 23:46
+- 変更内容:
+  backend に `GET /api/canvases/{canvasId}/export` と `POST /api/canvases/import` を追加し、添付なしの構造 JSON を書き出し・取り込みできるようにした。取り込み時は新規キャンバスを作成し、カードとリンクの ID を再採番する。frontend の一覧画面には `JSON取込` と `JSON書出` を追加し、エクスポート時に添付ファイルが含まれない旨の案内を表示するようにした。
+- 目的:
+  仕様で定義されている 1 キャンバス単位の JSON 持ち運びを MVP に入れ、バックアップと構造複製の導線を早期に成立させるため。
+- 影響範囲:
+  `backend/`、`frontend/`、`progress.md`
+- 関連ファイル:
+  `backend/app/api/routes/canvases.py`、`backend/app/services/canvas_service.py`、`backend/app/schemas/canvas.py`、`backend/tests/test_canvases.py`、`frontend/src/lib/api/backend.ts`、`frontend/src/lib/api/types.ts`、`frontend/src/features/canvas-list/components/canvas-list-page-client.tsx`、`frontend/src/app/globals.css`、`progress.md`
+- 未解決事項:
+  タグ強調 / 絞り込み、整列、添付は未実装。JSON インポートは最小 shape 確認をフロントに入れているが、本格的な schema プレビューや dry-run は未対応。
+- 次のアクション:
+  JSON 入出力をコミットして push し、その後はタグ強調 / 絞り込みか自動整列のどちらかへ進む。

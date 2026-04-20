@@ -63,3 +63,11 @@ export type CanvasDocument = {
   relatedLinks: RelatedLink[];
   attachments: Attachment[];
 };
+
+export type CanvasExportPayload = {
+  version: "1.0";
+  canvas: Canvas;
+  cards: Card[];
+  hierarchyLinks: HierarchyLink[];
+  relatedLinks: RelatedLink[];
+};

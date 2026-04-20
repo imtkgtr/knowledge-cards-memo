@@ -2,11 +2,13 @@ from fastapi import APIRouter, Depends, Response, status
 
 from app.core.auth import AuthenticatedUser, get_current_user
 from app.schemas.canvas import (
+    CanvasExportSchema,
     CanvasDocumentResponse,
     CanvasResponse,
     CanvasSummaryResponse,
     CanvasSummarySchema,
     CreateCanvasRequest,
+    ImportCanvasRequest,
     SaveCanvasDocumentRequest,
     UpdateCanvasRequest,
 )
@@ -87,3 +89,22 @@ def save_canvas_document(
 ) -> CanvasDocumentResponse:
     document = service.save_canvas_document(user, canvas_id, payload)
     return CanvasDocumentResponse(canvas=document)
+
+
+@router.get("/{canvas_id}/export", response_model=CanvasExportSchema)
+def export_canvas(
+    canvas_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    service: CanvasService = Depends(get_canvas_service),
+) -> CanvasExportSchema:
+    return service.export_canvas(user, canvas_id)
+
+
+@router.post("/import", response_model=CanvasSummaryResponse, status_code=status.HTTP_201_CREATED)
+def import_canvas(
+    payload: ImportCanvasRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+    service: CanvasService = Depends(get_canvas_service),
+) -> CanvasSummaryResponse:
+    imported = service.import_canvas(user, payload)
+    return CanvasSummaryResponse(canvas=imported)

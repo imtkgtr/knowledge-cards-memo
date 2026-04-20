@@ -1,11 +1,11 @@
 "use client";
 
-import { getBrowserProxyPath } from "@/lib/api/backend";
-import type { CanvasSummary } from "@/lib/api/types";
+import { clientExportCanvas, clientImportCanvas, getBrowserProxyPath } from "@/lib/api/backend";
+import type { CanvasExportPayload, CanvasSummary } from "@/lib/api/types";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { CanvasNameModal } from "./canvas-name-modal";
 
 type CanvasListPageClientProps = {
@@ -23,6 +23,24 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function sanitizeFileName(value: string) {
+  return value.trim().replace(/[\\/:*?"<>|]+/g, "-") || "knowledge-canvas";
+}
+
+function isCanvasImportPayload(value: unknown): value is CanvasExportPayload {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const payload = value as Record<string, unknown>;
+  return (
+    payload.version === "1.0" &&
+    typeof payload.canvas === "object" &&
+    Array.isArray(payload.cards) &&
+    Array.isArray(payload.hierarchyLinks) &&
+    Array.isArray(payload.relatedLinks)
+  );
+}
+
 export function CanvasListPageClient({
   initialCanvases,
   initialError,
@@ -32,8 +50,10 @@ export function CanvasListPageClient({
   const supabase = createBrowserSupabaseClient();
   const [canvases, setCanvases] = useState(initialCanvases);
   const [error, setError] = useState<string | null>(initialError);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [modalState, setModalState] = useState<ModalState>(null);
   const [isPending, startTransition] = useTransition();
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const sortedCanvases = useMemo(
     () =>
@@ -99,6 +119,7 @@ export function CanvasListPageClient({
     }
 
     setError(null);
+    setSuccessMessage(null);
     startTransition(async () => {
       try {
         if (modalState.mode === "create") {
@@ -127,6 +148,7 @@ export function CanvasListPageClient({
 
   function handleDuplicate(canvas: CanvasSummary) {
     setError(null);
+    setSuccessMessage(null);
     startTransition(async () => {
       try {
         const payload = (await request(`/api/canvases/${canvas.id}/duplicate`, {
@@ -145,6 +167,7 @@ export function CanvasListPageClient({
     }
 
     setError(null);
+    setSuccessMessage(null);
     startTransition(async () => {
       try {
         await request(`/api/canvases/${canvas.id}`, {
@@ -163,6 +186,75 @@ export function CanvasListPageClient({
     router.refresh();
   }
 
+  function handleImportClick() {
+    setError(null);
+    setSuccessMessage(null);
+    importInputRef.current?.click();
+  }
+
+  function handleExport(canvas: CanvasSummary) {
+    setError(null);
+    setSuccessMessage(null);
+    startTransition(async () => {
+      try {
+        const accessToken = await getAccessToken();
+        if (!accessToken) {
+          router.push("/login");
+          router.refresh();
+          return;
+        }
+        const payload = await clientExportCanvas(accessToken, canvas.id);
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${sanitizeFileName(canvas.name)}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+        setSuccessMessage("JSON を書き出しました。添付ファイルは含まれません。");
+      } catch (requestError) {
+        setError(
+          requestError instanceof Error ? requestError.message : "JSON の書き出しに失敗しました。",
+        );
+      }
+    });
+  }
+
+  async function handleImportFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    setError(null);
+    setSuccessMessage(null);
+    startTransition(async () => {
+      try {
+        const accessToken = await getAccessToken();
+        if (!accessToken) {
+          router.push("/login");
+          router.refresh();
+          return;
+        }
+        const text = await file.text();
+        const payload = JSON.parse(text) as unknown;
+        if (!isCanvasImportPayload(payload)) {
+          throw new Error("JSON の形式が不正です。");
+        }
+        const imported = await clientImportCanvas(accessToken, payload);
+        setCanvases((current) => [imported, ...current]);
+        setSuccessMessage("JSON を新規キャンバスとして取り込みました。");
+      } catch (requestError) {
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : "JSON のインポートに失敗しました。",
+        );
+      }
+    });
+  }
+
   return (
     <main className="dashboard-page">
       <header className="dashboard-header">
@@ -177,13 +269,25 @@ export function CanvasListPageClient({
           <button className="button button--accent" onClick={openCreateModal} type="button">
             新規作成
           </button>
+          <button className="button button--ghost" onClick={handleImportClick} type="button">
+            JSON取込
+          </button>
           <button className="button button--ghost" onClick={handleSignOut} type="button">
             ログアウト
           </button>
         </div>
       </header>
 
+      <input
+        accept="application/json,.json"
+        className="sr-only"
+        onChange={handleImportFile}
+        ref={importInputRef}
+        type="file"
+      />
+
       {error ? <p className="notice notice--error">{error}</p> : null}
+      {successMessage ? <p className="notice notice--success">{successMessage}</p> : null}
       {isPending ? <p className="muted">処理中です...</p> : null}
 
       <section className="canvas-grid">
@@ -208,6 +312,13 @@ export function CanvasListPageClient({
                   <p>更新: {formatDate(canvas.updatedAt)}</p>
                 </div>
                 <div className="canvas-card__actions">
+                  <button
+                    className="button button--ghost"
+                    onClick={() => handleExport(canvas)}
+                    type="button"
+                  >
+                    JSON書出
+                  </button>
                   <button
                     className="button button--ghost"
                     onClick={() => openRenameModal(canvas)}

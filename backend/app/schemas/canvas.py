@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any, Literal
 
 from pydantic import Field
 
@@ -72,6 +73,14 @@ class CanvasDocumentSchema(CamelModel):
     attachments: list[AttachmentSchema] = Field(default_factory=list)
 
 
+class CanvasExportSchema(CamelModel):
+    version: Literal["1.0"] = "1.0"
+    canvas: CanvasSchema
+    cards: list[CardSchema] = Field(default_factory=list)
+    hierarchy_links: list[HierarchyLinkSchema] = Field(default_factory=list)
+    related_links: list[RelatedLinkSchema] = Field(default_factory=list)
+
+
 class CreateCanvasRequest(CamelModel):
     name: str
 
@@ -101,3 +110,7 @@ class SaveCanvasDocumentRequest(CamelModel):
     hierarchy_links: list[HierarchyLinkSchema] = Field(default_factory=list)
     related_links: list[RelatedLinkSchema] = Field(default_factory=list)
     attachments: list[AttachmentSchema] = Field(default_factory=list)
+
+
+class ImportCanvasRequest(CamelModel):
+    payload: dict[str, Any]
