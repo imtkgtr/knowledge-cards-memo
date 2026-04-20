@@ -97,3 +97,17 @@
   リンク追加 UI、ロック、複数選択、Undo/Redo、自動保存、検索、整列は未実装。カード作成位置は可視範囲中心の厳密計算ではなく簡易オフセット配置。
 - 次のアクション:
   リンク追加モード、ロック、複数選択、Undo/Redo を editor shell 上へ順次追加する。
+
+## 2026-04-20 03:15
+- 変更内容:
+  editor shell に階層リンク追加モード、通常リンク追加モード、単体ロック、一括ロック、一括解除、複数選択、一括色変更、一括削除、リンク削除、リンク一覧表示を追加した。あわせて canvas document のフロント型定義を具体化し、リンク追加失敗時に誤った成功メッセージを出さないよう調整した。
+- 目的:
+  仕様書で定義した主要編集機能のうち、カード間関係の編集とロック制御を実際に操作できる状態へ進めるため。
+- 影響範囲:
+  `frontend/`、`task.md`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/stores/use-canvas-editor-store.ts`、`frontend/src/lib/api/types.ts`、`frontend/src/app/globals.css`、`task.md`、`progress.md`
+- 未解決事項:
+  Undo/Redo、自動保存、検索、整列、添付、JSON import/export は未実装。リンクの詳細表示はカードタイトル中心で、今後はラベルや経路可視化を拡張余地として残している。
+- 次のアクション:
+  フロントエンドの lint / build を再実行して今回の編集機能追加を確定し、その後 Undo/Redo と自動保存のフェーズへ進む。

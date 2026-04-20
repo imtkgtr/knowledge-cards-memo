@@ -220,6 +220,22 @@ input {
   gap: 16px;
 }
 
+.selection-toolbar {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.selection-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .editor-palette,
 .editor-detail {
   padding: 18px;
@@ -277,6 +293,35 @@ input {
 
 .detail-panel--empty {
   align-content: start;
+}
+
+.detail-links {
+  display: grid;
+  gap: 10px;
+}
+
+.detail-links h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.detail-links ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.detail-links li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .textarea {

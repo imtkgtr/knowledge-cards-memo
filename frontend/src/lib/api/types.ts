@@ -31,10 +31,35 @@ export type Card = {
   updatedAt: string;
 };
 
+export type HierarchyLink = {
+  id: string;
+  canvasId: string;
+  parentCardId: string;
+  childCardId: string;
+  createdAt: string;
+};
+
+export type RelatedLink = {
+  id: string;
+  canvasId: string;
+  cardAId: string;
+  cardBId: string;
+  createdAt: string;
+};
+
+export type Attachment = {
+  id: string;
+  cardId: string;
+  kind: "image" | "pdf" | "text";
+  fileName: string;
+  storagePath: string;
+  createdAt: string;
+};
+
 export type CanvasDocument = {
   canvas: Canvas;
   cards: Card[];
-  hierarchyLinks: Array<Record<string, unknown>>;
-  relatedLinks: Array<Record<string, unknown>>;
-  attachments: Array<Record<string, unknown>>;
+  hierarchyLinks: HierarchyLink[];
+  relatedLinks: RelatedLink[];
+  attachments: Attachment[];
 };

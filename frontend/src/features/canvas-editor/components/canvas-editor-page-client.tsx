@@ -3,20 +3,21 @@
 import {
   Background,
   Controls,
+  type Edge,
+  MarkerType,
   MiniMap,
-  type Node,
   type NodeTypes,
   ReactFlow,
   useEdgesState,
   useNodesState,
 } from "@xyflow/react";
-import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
 import "@xyflow/react/dist/style.css";
 import { clientSaveCanvasDocument } from "@/lib/api/backend";
 import type { CanvasDocument } from "@/lib/api/types";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { useCanvasEditorStore } from "@/stores/use-canvas-editor-store";
+import Link from "next/link";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { CardNode, type KnowledgeCardNode } from "./card-node";
 import { CreateCardModal } from "./create-card-modal";
 
@@ -36,23 +37,40 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function findCardLabel(document: CanvasDocument | null, cardId: string) {
+  return document?.cards.find((card) => card.id === cardId)?.title || cardId;
+}
+
 export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClientProps) {
   const supabase = createBrowserSupabaseClient();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const document = useCanvasEditorStore((state) => state.document);
   const selectedCardId = useCanvasEditorStore((state) => state.selectedCardId);
+  const selectedCardIds = useCanvasEditorStore((state) => state.selectedCardIds);
   const nextCardColor = useCanvasEditorStore((state) => state.nextCardColor);
+  const activeMode = useCanvasEditorStore((state) => state.activeMode);
   const saveState = useCanvasEditorStore((state) => state.saveState);
   const saveError = useCanvasEditorStore((state) => state.saveError);
   const loadDocument = useCanvasEditorStore((state) => state.loadDocument);
   const selectCard = useCanvasEditorStore((state) => state.selectCard);
+  const setSelectedCardIds = useCanvasEditorStore((state) => state.setSelectedCardIds);
   const createCard = useCanvasEditorStore((state) => state.createCard);
   const updateCard = useCanvasEditorStore((state) => state.updateCard);
   const moveCard = useCanvasEditorStore((state) => state.moveCard);
+  const addHierarchyLink = useCanvasEditorStore((state) => state.addHierarchyLink);
+  const addRelatedLink = useCanvasEditorStore((state) => state.addRelatedLink);
+  const removeHierarchyLink = useCanvasEditorStore((state) => state.removeHierarchyLink);
+  const removeRelatedLink = useCanvasEditorStore((state) => state.removeRelatedLink);
+  const toggleCardLock = useCanvasEditorStore((state) => state.toggleCardLock);
+  const bulkSetColor = useCanvasEditorStore((state) => state.bulkSetColor);
+  const bulkToggleLock = useCanvasEditorStore((state) => state.bulkToggleLock);
+  const bulkDeleteCards = useCanvasEditorStore((state) => state.bulkDeleteCards);
   const setCanvasName = useCanvasEditorStore((state) => state.setCanvasName);
   const setNextCardColor = useCanvasEditorStore((state) => state.setNextCardColor);
+  const setActiveMode = useCanvasEditorStore((state) => state.setActiveMode);
   const setSaveState = useCanvasEditorStore((state) => state.setSaveState);
 
   useEffect(() => {
@@ -65,6 +83,8 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         id: card.id,
         type: "knowledgeCard",
         position: { x: card.x, y: card.y },
+        draggable: !card.isLocked,
+        selectable: true,
         data: {
           title: card.title,
           color: card.color,
@@ -75,16 +95,49 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     [document?.cards],
   );
 
+  const edgesFromDocument = useMemo<Edge[]>(
+    () => [
+      ...((document?.hierarchyLinks ?? []).map((link) => ({
+        id: link.id,
+        source: link.parentCardId,
+        target: link.childCardId,
+        type: "smoothstep",
+        markerEnd: { type: MarkerType.ArrowClosed },
+        style: { strokeWidth: 2 },
+        data: { kind: "hierarchy" },
+      })) satisfies Edge[]),
+      ...((document?.relatedLinks ?? []).map((link) => ({
+        id: link.id,
+        source: link.cardAId,
+        target: link.cardBId,
+        type: "default",
+        style: { strokeDasharray: "6 4", strokeWidth: 2 },
+        data: { kind: "related" },
+      })) satisfies Edge[]),
+    ],
+    [document?.hierarchyLinks, document?.relatedLinks],
+  );
+
   const [nodes, setNodes, onNodesChange] = useNodesState(nodesFromDocument);
-  const [edges, , onEdgesChange] = useEdgesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(edgesFromDocument);
 
   useEffect(() => {
     setNodes(nodesFromDocument);
   }, [nodesFromDocument, setNodes]);
 
+  useEffect(() => {
+    setEdges(edgesFromDocument);
+  }, [edgesFromDocument, setEdges]);
+
   const selectedCard = useMemo(
     () => document?.cards.find((card) => card.id === selectedCardId) ?? null,
     [document?.cards, selectedCardId],
+  );
+
+  const lockedSelected = useMemo(
+    () =>
+      (document?.cards ?? []).some((card) => selectedCardIds.includes(card.id) && card.isLocked),
+    [document?.cards, selectedCardIds],
   );
 
   function handleCreateCard(title: string) {
@@ -94,6 +147,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       y: 120 + (document?.cards.length ?? 0) * 20,
     });
     setIsCreateModalOpen(false);
+    setInteractionMessage(null);
   }
 
   async function handleSave() {
@@ -127,6 +181,54 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     });
   }
 
+  function toggleMode(mode: "addHierarchyLink" | "addRelatedLink") {
+    setInteractionMessage(null);
+    setActiveMode(activeMode === mode ? "idle" : mode);
+  }
+
+  function handleNodeClick(nodeId: string) {
+    if (activeMode === "idle") {
+      selectCard(nodeId);
+      setInteractionMessage(null);
+      return;
+    }
+
+    if (!selectedCardId) {
+      selectCard(nodeId);
+      setInteractionMessage("起点カードを選択してから、対象カードをクリックしてください。");
+      return;
+    }
+
+    if (selectedCardId === nodeId) {
+      setInteractionMessage("同じカード同士は接続できません。");
+      return;
+    }
+
+    if (activeMode === "addHierarchyLink") {
+      const wasAdded = addHierarchyLink(selectedCardId, nodeId);
+      setInteractionMessage(
+        wasAdded
+          ? "階層リンクを追加しました。"
+          : "階層リンクを追加できませんでした。重複、循環、ロック状態を確認してください。",
+      );
+      return;
+    }
+
+    const wasAdded = addRelatedLink(selectedCardId, nodeId);
+    setInteractionMessage(
+      wasAdded
+        ? "通常リンクを追加しました。"
+        : "通常リンクを追加できませんでした。重複またはロック状態を確認してください。",
+    );
+  }
+
+  function handleSelectionChange(ids: string[]) {
+    setSelectedCardIds(ids);
+    if (ids.length <= 1) {
+      setInteractionMessage(null);
+    }
+  }
+
   return (
     <main className="editor-shell">
       <header className="editor-topbar">
@@ -152,8 +254,51 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         </div>
       </header>
 
+      {selectedCardIds.length > 1 ? (
+        <section className="selection-toolbar">
+          <p className="muted">複数選択: {selectedCardIds.length} 件</p>
+          <div className="selection-toolbar__actions">
+            {colorChoices.map((color) => (
+              <button
+                aria-label={`一括色 ${color}`}
+                className="color-chip"
+                disabled={lockedSelected}
+                key={color}
+                onClick={() => bulkSetColor(selectedCardIds, color)}
+                style={{ backgroundColor: color }}
+                type="button"
+              />
+            ))}
+            <button
+              className="button button--ghost"
+              disabled={lockedSelected}
+              onClick={() => bulkToggleLock(selectedCardIds, true)}
+              type="button"
+            >
+              一括ロック
+            </button>
+            <button
+              className="button button--ghost"
+              onClick={() => bulkToggleLock(selectedCardIds, false)}
+              type="button"
+            >
+              一括解除
+            </button>
+            <button
+              className="button button--ghost"
+              disabled={lockedSelected}
+              onClick={() => bulkDeleteCards(selectedCardIds)}
+              type="button"
+            >
+              一括削除
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       {saveMessage ? <p className="notice notice--success">{saveMessage}</p> : null}
       {saveError ? <p className="notice notice--error">{saveError}</p> : null}
+      {interactionMessage ? <p className="notice notice--success">{interactionMessage}</p> : null}
 
       <section className="editor-layout">
         <aside className="editor-palette">
@@ -164,13 +309,45 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           >
             カード追加
           </button>
+          <button
+            className={
+              activeMode === "addHierarchyLink" ? "button button--accent" : "button button--ghost"
+            }
+            disabled={selectedCardIds.length !== 1}
+            onClick={() => toggleMode("addHierarchyLink")}
+            type="button"
+          >
+            階層リンク追加
+          </button>
+          <button
+            className={
+              activeMode === "addRelatedLink" ? "button button--accent" : "button button--ghost"
+            }
+            disabled={selectedCardIds.length !== 1}
+            onClick={() => toggleMode("addRelatedLink")}
+            type="button"
+          >
+            通常リンク追加
+          </button>
+          <button
+            className="button button--ghost"
+            disabled={!selectedCardId}
+            onClick={() => selectedCardId && toggleCardLock(selectedCardId)}
+            type="button"
+          >
+            {selectedCard?.isLocked ? "ロック解除" : "ロック"}
+          </button>
           <div className="editor-palette__colors">
             {colorChoices.map((color) => (
               <button
                 aria-label={`色 ${color}`}
                 className={nextCardColor === color ? "color-chip color-chip--active" : "color-chip"}
                 key={color}
-                onClick={() => setNextCardColor(color)}
+                onClick={() =>
+                  selectedCardIds.length > 1
+                    ? bulkSetColor(selectedCardIds, color)
+                    : setNextCardColor(color)
+                }
                 style={{ backgroundColor: color }}
                 type="button"
               />
@@ -182,13 +359,29 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           <ReactFlow
             edges={edges}
             fitView
+            multiSelectionKeyCode={["Meta", "Control", "Shift"]}
             nodeTypes={nodeTypes}
             nodes={nodes}
+            onEdgeClick={(_, edge) => {
+              if (edge.data?.kind === "hierarchy") {
+                removeHierarchyLink(edge.id);
+                return;
+              }
+              removeRelatedLink(edge.id);
+            }}
             onEdgesChange={onEdgesChange}
-            onNodeClick={(_, node) => selectCard(node.id)}
+            onNodeClick={(_, node) => handleNodeClick(node.id)}
             onNodeDragStop={(_, node) => moveCard(node.id, node.position.x, node.position.y)}
             onNodesChange={onNodesChange}
-            onPaneClick={() => selectCard(null)}
+            onPaneClick={() => {
+              selectCard(null);
+              setActiveMode("idle");
+              setInteractionMessage(null);
+            }}
+            onSelectionChange={({ nodes: currentNodes }) =>
+              handleSelectionChange(currentNodes.map((node) => node.id))
+            }
+            selectionKeyCode={["Meta", "Control", "Shift"]}
           >
             <Background gap={20} size={1} />
             <Controls />
@@ -204,6 +397,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                 <span>タイトル</span>
                 <input
                   className="input"
+                  disabled={selectedCard.isLocked}
                   onChange={(event) => updateCard(selectedCard.id, { title: event.target.value })}
                   value={selectedCard.title}
                 />
@@ -212,6 +406,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                 <span>本文</span>
                 <textarea
                   className="textarea"
+                  disabled={selectedCard.isLocked}
                   onChange={(event) => updateCard(selectedCard.id, { body: event.target.value })}
                   value={selectedCard.body}
                 />
@@ -220,6 +415,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                 <span>タグ</span>
                 <input
                   className="input"
+                  disabled={selectedCard.isLocked}
                   onChange={(event) =>
                     updateCard(selectedCard.id, {
                       tagNames: event.target.value
@@ -242,6 +438,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                           ? "color-chip color-chip--active"
                           : "color-chip"
                       }
+                      disabled={selectedCard.isLocked}
                       key={color}
                       onClick={() => updateCard(selectedCard.id, { color })}
                       style={{ backgroundColor: color }}
@@ -250,11 +447,89 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                   ))}
                 </div>
               </div>
+              <section className="detail-links">
+                <h3>階層リンク</h3>
+                {document?.hierarchyLinks.filter(
+                  (link) =>
+                    link.parentCardId === selectedCard.id || link.childCardId === selectedCard.id,
+                ).length ? (
+                  <ul>
+                    {document?.hierarchyLinks
+                      .filter(
+                        (link) =>
+                          link.parentCardId === selectedCard.id ||
+                          link.childCardId === selectedCard.id,
+                      )
+                      .map((link) => (
+                        <li key={link.id}>
+                          <span>
+                            {link.parentCardId === selectedCard.id ? "下位へ" : "上位から"}{" "}
+                            {findCardLabel(
+                              document ?? null,
+                              link.parentCardId === selectedCard.id
+                                ? link.childCardId
+                                : link.parentCardId,
+                            )}
+                          </span>
+                          <button
+                            className="button button--ghost"
+                            disabled={selectedCard.isLocked}
+                            onClick={() => removeHierarchyLink(link.id)}
+                            type="button"
+                          >
+                            削除
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                ) : (
+                  <p className="muted">リンクはありません。</p>
+                )}
+              </section>
+              <section className="detail-links">
+                <h3>通常リンク</h3>
+                {document?.relatedLinks.filter(
+                  (link) => link.cardAId === selectedCard.id || link.cardBId === selectedCard.id,
+                ).length ? (
+                  <ul>
+                    {document?.relatedLinks
+                      .filter(
+                        (link) =>
+                          link.cardAId === selectedCard.id || link.cardBId === selectedCard.id,
+                      )
+                      .map((link) => (
+                        <li key={link.id}>
+                          <span>
+                            {findCardLabel(
+                              document ?? null,
+                              link.cardAId === selectedCard.id ? link.cardBId : link.cardAId,
+                            )}
+                          </span>
+                          <button
+                            className="button button--ghost"
+                            disabled={selectedCard.isLocked}
+                            onClick={() => removeRelatedLink(link.id)}
+                            type="button"
+                          >
+                            削除
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                ) : (
+                  <p className="muted">リンクはありません。</p>
+                )}
+              </section>
+            </div>
+          ) : selectedCardIds.length > 1 ? (
+            <div className="detail-panel detail-panel--empty">
+              <h2>複数選択中</h2>
+              <p className="muted">一括色変更、一括ロック、一括削除は上部バーから実行できます。</p>
             </div>
           ) : (
             <div className="detail-panel detail-panel--empty">
               <h2>カードを選択してください</h2>
-              <p className="muted">右パネルではタイトル、本文、タグ、色を編集できます。</p>
+              <p className="muted">右パネルではタイトル、本文、タグ、色、リンクを編集できます。</p>
             </div>
           )}
         </aside>
