@@ -1,5 +1,7 @@
 import type { CanvasDocument, CanvasSummary } from "./types";
 
+const browserProxyBasePath = "/api/backend";
+
 function getRequiredValue(name: "BACKEND_INTERNAL_URL" | "NEXT_PUBLIC_API_BASE_URL") {
   const value = process.env[name];
   if (!value) {
@@ -14,6 +16,10 @@ export function getBackendInternalUrl() {
 
 export function getBackendPublicUrl() {
   return getRequiredValue("NEXT_PUBLIC_API_BASE_URL");
+}
+
+export function getBrowserProxyPath(path: string) {
+  return `${browserProxyBasePath}${path}`;
 }
 
 export async function serverFetchCanvases(accessToken: string): Promise<CanvasSummary[]> {
@@ -55,7 +61,7 @@ export async function clientSaveCanvasDocument(
   canvasId: string,
   document: CanvasDocument,
 ): Promise<CanvasDocument> {
-  const response = await fetch(`${getBackendPublicUrl()}/api/canvases/${canvasId}/document`, {
+  const response = await fetch(getBrowserProxyPath(`/canvases/${canvasId}/document`), {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",

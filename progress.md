@@ -111,3 +111,17 @@
   Undo/Redo、自動保存、検索、整列、添付、JSON import/export は未実装。リンクの詳細表示はカードタイトル中心で、今後はラベルや経路可視化を拡張余地として残している。
 - 次のアクション:
   フロントエンドの lint / build を再実行して今回の編集機能追加を確定し、その後 Undo/Redo と自動保存のフェーズへ進む。
+
+## 2026-04-20 14:45
+- 変更内容:
+  キャンバス新規作成がブラウザから失敗する経路を見直し、クライアント側の create / rename / duplicate / delete / document save を Next.js の同一オリジン proxy 経由に切り替えた。`frontend/src/app/api/backend/[...path]/route.ts` を追加し、ブラウザから直接 `NEXT_PUBLIC_API_BASE_URL` を叩かない構成へ変更した。
+- 目的:
+  ログイン後の一覧表示はできる一方で、新規作成などの変異系 API だけが CORS や公開 URL 差異の影響を受ける構成だったため、環境依存を減らして安定して操作できるようにするため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/app/api/backend/[...path]/route.ts`、`frontend/src/lib/api/backend.ts`、`frontend/src/features/canvas-list/components/canvas-list-page-client.tsx`、`progress.md`
+- 未解決事項:
+  Undo/Redo、自動保存、検索、整列、添付、JSON import/export は未実装。公開 URL を使う直接呼び出しは一覧・保存から除外したが、今後クライアント変異系 API を増やす場合も proxy 経由を前提に統一する必要がある。
+- 次のアクション:
+  今回の修正をコミットして push し、ユーザ環境でキャンバス新規作成が通ることを確認したうえで Undo/Redo と自動保存の実装へ進む。

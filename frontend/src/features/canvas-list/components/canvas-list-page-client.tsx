@@ -1,6 +1,6 @@
 "use client";
 
-import { getBackendPublicUrl } from "@/lib/api/backend";
+import { getBrowserProxyPath } from "@/lib/api/backend";
 import type { CanvasSummary } from "@/lib/api/types";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import Link from "next/link";
@@ -58,7 +58,7 @@ export function CanvasListPageClient({
       throw new Error("セッションが見つかりません。");
     }
 
-    const response = await fetch(`${getBackendPublicUrl()}${path}`, {
+    const response = await fetch(getBrowserProxyPath(path), {
       ...init,
       headers: {
         "Content-Type": "application/json",
