@@ -1,39 +1,57 @@
 "use client";
 
 import type { CanvasDocument, Card, HierarchyLink } from "@/lib/api/types";
-import { produce } from "immer";
+import { type Patch, applyPatches, enablePatches, produce, produceWithPatches } from "immer";
 import { create } from "zustand";
+
+enablePatches();
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 export type ActiveMode = "idle" | "addHierarchyLink" | "addRelatedLink";
 
+type HistoryEntry = {
+  createdAt: string;
+  inversePatches: Patch[];
+  label: string;
+  patches: Patch[];
+};
+
 type CanvasEditorState = {
+  activeMode: ActiveMode;
   document: CanvasDocument | null;
+  history: HistoryEntry[];
+  historyIndex: number;
+  isDirty: boolean;
+  lastSavedAt: string | null;
+  nextCardColor: string;
+  saveError: string | null;
+  saveState: SaveState;
   selectedCardId: string | null;
   selectedCardIds: string[];
-  nextCardColor: string;
-  activeMode: ActiveMode;
-  saveState: SaveState;
-  saveError: string | null;
-  loadDocument: (document: CanvasDocument) => void;
-  selectCard: (cardId: string | null) => void;
-  setSelectedCardIds: (cardIds: string[]) => void;
-  createCard: (input: { body?: string; title: string; x: number; y: number }) => void;
-  updateCard: (cardId: string, updates: Partial<CanvasDocument["cards"][number]>) => void;
-  moveCard: (cardId: string, x: number, y: number) => void;
   addHierarchyLink: (parentCardId: string, childCardId: string) => boolean;
   addRelatedLink: (cardAId: string, cardBId: string) => boolean;
-  removeHierarchyLink: (linkId: string) => void;
-  removeRelatedLink: (linkId: string) => void;
-  toggleCardLock: (cardId: string) => void;
+  bulkDeleteCards: (cardIds: string[]) => void;
   bulkSetColor: (cardIds: string[], color: string) => void;
   bulkToggleLock: (cardIds: string[], isLocked: boolean) => void;
-  bulkDeleteCards: (cardIds: string[]) => void;
+  createCard: (input: { body?: string; title: string; x: number; y: number }) => void;
+  loadDocument: (document: CanvasDocument) => void;
+  markSaved: (savedAt?: string | null) => void;
+  moveCard: (cardId: string, x: number, y: number) => void;
+  redo: () => void;
+  removeHierarchyLink: (linkId: string) => void;
+  removeRelatedLink: (linkId: string) => void;
+  selectCard: (cardId: string | null) => void;
+  setActiveMode: (mode: ActiveMode) => void;
   setCanvasName: (name: string) => void;
   setNextCardColor: (color: string) => void;
-  setActiveMode: (mode: ActiveMode) => void;
   setSaveState: (saveState: SaveState, saveError?: string | null) => void;
+  setSelectedCardIds: (cardIds: string[]) => void;
+  toggleCardLock: (cardId: string) => void;
+  undo: () => void;
+  updateCard: (cardId: string, updates: Partial<CanvasDocument["cards"][number]>) => void;
 };
+
+const HISTORY_LIMIT = 100;
 
 function getNow() {
   return new Date().toISOString();
@@ -83,51 +101,212 @@ function createsHierarchyCycle(links: HierarchyLink[], parentCardId: string, chi
   return false;
 }
 
-export const useCanvasEditorStore = create<CanvasEditorState>((set) => ({
-  document: null,
-  selectedCardId: null,
-  selectedCardIds: [],
-  nextCardColor: "#eed9b6",
-  activeMode: "idle",
-  saveState: "idle",
-  saveError: null,
-  loadDocument: (document) =>
-    set({
-      document,
-      selectedCardId: null,
-      selectedCardIds: [],
-      nextCardColor: "#eed9b6",
-      activeMode: "idle",
-      saveState: "idle",
-      saveError: null,
-    }),
-  selectCard: (selectedCardId) =>
-    set({
-      selectedCardId,
-      selectedCardIds: selectedCardId ? [selectedCardId] : [],
-    }),
-  setSelectedCardIds: (selectedCardIds) =>
-    set({
-      selectedCardIds,
-      selectedCardId: selectedCardIds.length === 1 ? selectedCardIds[0] : null,
-    }),
-  createCard: ({ body = "", title, x, y }) =>
-    set((state) => {
-      if (!state.document) {
-        return state;
-      }
-      const now = getNow();
-      return produce(state, (draft) => {
-        if (!draft.document) {
+function sanitizeSelection(
+  state: Pick<CanvasEditorState, "document" | "selectedCardId" | "selectedCardIds">,
+) {
+  const cardIds = new Set((state.document?.cards ?? []).map((card) => card.id));
+  const selectedCardIds = state.selectedCardIds.filter((cardId) => cardIds.has(cardId));
+  return {
+    selectedCardId:
+      selectedCardIds.length === 1 && state.selectedCardId && cardIds.has(state.selectedCardId)
+        ? state.selectedCardId
+        : selectedCardIds.length === 1
+          ? selectedCardIds[0]
+          : null,
+    selectedCardIds,
+  };
+}
+
+function pushHistory(history: HistoryEntry[], historyIndex: number, entry: HistoryEntry) {
+  const nextHistory = history.slice(0, historyIndex + 1);
+  nextHistory.push(entry);
+  if (nextHistory.length <= HISTORY_LIMIT) {
+    return {
+      history: nextHistory,
+      historyIndex: nextHistory.length - 1,
+    };
+  }
+  return {
+    history: nextHistory.slice(-HISTORY_LIMIT),
+    historyIndex: HISTORY_LIMIT - 1,
+  };
+}
+
+export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
+  function updateDocument(
+    label: string,
+    recipe: (draft: CanvasDocument) => void,
+    afterMutate?: (draft: CanvasEditorState) => void,
+  ) {
+    const state = get();
+    if (!state.document) {
+      return false;
+    }
+
+    const [nextDocument, patches, inversePatches] = produceWithPatches(state.document, recipe);
+    if (patches.length === 0) {
+      return false;
+    }
+
+    const nextHistoryState = pushHistory(state.history, state.historyIndex, {
+      createdAt: getNow(),
+      inversePatches,
+      label,
+      patches,
+    });
+
+    set(
+      produce((draft: CanvasEditorState) => {
+        draft.document = nextDocument;
+        draft.history = nextHistoryState.history;
+        draft.historyIndex = nextHistoryState.historyIndex;
+        draft.isDirty = true;
+        draft.saveState = "idle";
+        draft.saveError = null;
+        if (afterMutate) {
+          afterMutate(draft);
+        }
+      }),
+    );
+    return true;
+  }
+
+  return {
+    activeMode: "idle",
+    document: null,
+    history: [],
+    historyIndex: -1,
+    isDirty: false,
+    lastSavedAt: null,
+    nextCardColor: "#eed9b6",
+    saveError: null,
+    saveState: "idle",
+    selectedCardId: null,
+    selectedCardIds: [],
+    addHierarchyLink: (parentCardId, childCardId) =>
+      updateDocument(
+        "階層リンク追加",
+        (draft) => {
+          if (parentCardId === childCardId) {
+            return;
+          }
+          const parent = draft.cards.find((card) => card.id === parentCardId);
+          const child = draft.cards.find((card) => card.id === childCardId);
+          if (!parent || !child || parent.isLocked || child.isLocked) {
+            return;
+          }
+          const exists = draft.hierarchyLinks.some(
+            (link) => link.parentCardId === parentCardId && link.childCardId === childCardId,
+          );
+          if (exists || createsHierarchyCycle(draft.hierarchyLinks, parentCardId, childCardId)) {
+            return;
+          }
+          draft.hierarchyLinks.push({
+            id: randomId("hierarchy"),
+            canvasId: draft.canvas.id,
+            parentCardId,
+            childCardId,
+            createdAt: getNow(),
+          });
+          recalculateChildCount(draft.cards, draft.hierarchyLinks);
+        },
+        (draft) => {
+          draft.activeMode = "idle";
+        },
+      ),
+    addRelatedLink: (cardAId, cardBId) =>
+      updateDocument(
+        "通常リンク追加",
+        (draft) => {
+          if (cardAId === cardBId) {
+            return;
+          }
+          const cardA = draft.cards.find((card) => card.id === cardAId);
+          const cardB = draft.cards.find((card) => card.id === cardBId);
+          if (!cardA || !cardB || cardA.isLocked || cardB.isLocked) {
+            return;
+          }
+          const [left, right] = sortedPair(cardAId, cardBId);
+          const exists = draft.relatedLinks.some(
+            (link) => link.cardAId === left && link.cardBId === right,
+          );
+          if (exists) {
+            return;
+          }
+          draft.relatedLinks.push({
+            id: randomId("related"),
+            canvasId: draft.canvas.id,
+            cardAId: left,
+            cardBId: right,
+            createdAt: getNow(),
+          });
+        },
+        (draft) => {
+          draft.activeMode = "idle";
+        },
+      ),
+    bulkDeleteCards: (cardIds) => {
+      updateDocument(
+        "カード一括削除",
+        (draft) => {
+          const lockedIncluded = draft.cards.some(
+            (card) => cardIds.includes(card.id) && card.isLocked,
+          );
+          if (lockedIncluded) {
+            return;
+          }
+          draft.cards = draft.cards.filter((card) => !cardIds.includes(card.id));
+          draft.hierarchyLinks = draft.hierarchyLinks.filter(
+            (link) => !cardIds.includes(link.parentCardId) && !cardIds.includes(link.childCardId),
+          );
+          draft.relatedLinks = draft.relatedLinks.filter(
+            (link) => !cardIds.includes(link.cardAId) && !cardIds.includes(link.cardBId),
+          );
+          recalculateChildCount(draft.cards, draft.hierarchyLinks);
+        },
+        (draft) => {
+          draft.selectedCardId = null;
+          draft.selectedCardIds = [];
+        },
+      );
+    },
+    bulkSetColor: (cardIds, color) => {
+      updateDocument("カード一括色変更", (draft) => {
+        const lockedIncluded = draft.cards.some(
+          (card) => cardIds.includes(card.id) && card.isLocked,
+        );
+        if (lockedIncluded) {
           return;
         }
-        draft.document.cards.push({
-          id: randomId("card"),
-          canvasId: draft.document.canvas.id,
+        for (const card of draft.cards) {
+          if (cardIds.includes(card.id)) {
+            card.color = color;
+            card.updatedAt = getNow();
+          }
+        }
+      });
+    },
+    bulkToggleLock: (cardIds, isLocked) => {
+      updateDocument("カード一括ロック切替", (draft) => {
+        for (const card of draft.cards) {
+          if (cardIds.includes(card.id)) {
+            card.isLocked = isLocked;
+            card.updatedAt = getNow();
+          }
+        }
+      });
+    },
+    createCard: ({ body = "", title, x, y }) => {
+      const cardId = randomId("card");
+      const now = getNow();
+      const didCreate = updateDocument("カード追加", (draft) => {
+        draft.cards.push({
+          id: cardId,
+          canvasId: draft.canvas.id,
           title: title.trim(),
           body,
           tagNames: [],
-          color: draft.nextCardColor,
+          color: get().nextCardColor,
           isLocked: false,
           x,
           y,
@@ -135,223 +314,137 @@ export const useCanvasEditorStore = create<CanvasEditorState>((set) => ({
           createdAt: now,
           updatedAt: now,
         });
-        draft.selectedCardId = draft.document.cards.at(-1)?.id ?? null;
-        draft.selectedCardIds = draft.selectedCardId ? [draft.selectedCardId] : [];
-        draft.activeMode = "idle";
-        draft.saveState = "idle";
-        draft.saveError = null;
       });
-    }),
-  updateCard: (cardId, updates) =>
-    set((state) =>
-      produce(state, (draft) => {
-        const card = draft.document?.cards.find((item) => item.id === cardId);
-        if (!card || card.isLocked) {
-          return;
-        }
-        Object.assign(card, updates, { updatedAt: getNow() });
-        draft.saveState = "idle";
-        draft.saveError = null;
+      if (!didCreate) {
+        return;
+      }
+      set({
+        activeMode: "idle",
+        selectedCardId: cardId,
+        selectedCardIds: [cardId],
+      });
+    },
+    loadDocument: (document) =>
+      set({
+        activeMode: "idle",
+        document,
+        history: [],
+        historyIndex: -1,
+        isDirty: false,
+        lastSavedAt: document.canvas.updatedAt,
+        nextCardColor: "#eed9b6",
+        saveError: null,
+        saveState: "idle",
+        selectedCardId: null,
+        selectedCardIds: [],
       }),
-    ),
-  moveCard: (cardId, x, y) =>
-    set((state) =>
-      produce(state, (draft) => {
-        const card = draft.document?.cards.find((item) => item.id === cardId);
+    markSaved: (savedAt = getNow()) =>
+      set({
+        isDirty: false,
+        lastSavedAt: savedAt,
+        saveError: null,
+        saveState: "saved",
+      }),
+    moveCard: (cardId, x, y) => {
+      updateDocument("カード移動", (draft) => {
+        const card = draft.cards.find((item) => item.id === cardId);
         if (!card || card.isLocked) {
           return;
         }
         card.x = x;
         card.y = y;
         card.updatedAt = getNow();
-        draft.saveState = "idle";
-        draft.saveError = null;
+      });
+    },
+    redo: () => {
+      const state = get();
+      const entry = state.history[state.historyIndex + 1];
+      if (!state.document || !entry) {
+        return;
+      }
+      const nextDocument = applyPatches(state.document, entry.patches);
+      set(
+        produce((draft: CanvasEditorState) => {
+          draft.document = nextDocument;
+          draft.historyIndex += 1;
+          draft.isDirty = true;
+          draft.saveState = "idle";
+          draft.saveError = null;
+          Object.assign(draft, sanitizeSelection(draft));
+        }),
+      );
+    },
+    removeHierarchyLink: (linkId) => {
+      updateDocument("階層リンク削除", (draft) => {
+        draft.hierarchyLinks = draft.hierarchyLinks.filter((link) => link.id !== linkId);
+        recalculateChildCount(draft.cards, draft.hierarchyLinks);
+      });
+    },
+    removeRelatedLink: (linkId) => {
+      updateDocument("通常リンク削除", (draft) => {
+        draft.relatedLinks = draft.relatedLinks.filter((link) => link.id !== linkId);
+      });
+    },
+    selectCard: (selectedCardId) =>
+      set({
+        selectedCardId,
+        selectedCardIds: selectedCardId ? [selectedCardId] : [],
       }),
-    ),
-  addHierarchyLink: (parentCardId, childCardId) => {
-    let wasAdded = false;
-    set((state) =>
-      produce(state, (draft) => {
-        if (!draft.document || parentCardId === childCardId) {
+    setActiveMode: (activeMode) => set({ activeMode }),
+    setCanvasName: (name) => {
+      updateDocument("キャンバス名変更", (draft) => {
+        const nextName = name.trim();
+        if (!nextName || draft.canvas.name === nextName) {
           return;
         }
-        const parent = draft.document.cards.find((card) => card.id === parentCardId);
-        const child = draft.document.cards.find((card) => card.id === childCardId);
-        if (!parent || !child || parent.isLocked || child.isLocked) {
-          return;
-        }
-        const exists = draft.document.hierarchyLinks.some(
-          (link) => link.parentCardId === parentCardId && link.childCardId === childCardId,
-        );
-        if (
-          exists ||
-          createsHierarchyCycle(draft.document.hierarchyLinks, parentCardId, childCardId)
-        ) {
-          return;
-        }
-        draft.document.hierarchyLinks.push({
-          id: randomId("hierarchy"),
-          canvasId: draft.document.canvas.id,
-          parentCardId,
-          childCardId,
-          createdAt: getNow(),
-        });
-        recalculateChildCount(draft.document.cards, draft.document.hierarchyLinks);
-        draft.activeMode = "idle";
-        draft.saveState = "idle";
-        draft.saveError = null;
-        wasAdded = true;
+        draft.canvas.name = nextName;
+        draft.canvas.updatedAt = getNow();
+      });
+    },
+    setNextCardColor: (nextCardColor) => set({ nextCardColor }),
+    setSaveState: (saveState, saveError = null) => set({ saveError, saveState }),
+    setSelectedCardIds: (selectedCardIds) =>
+      set({
+        selectedCardId: selectedCardIds.length === 1 ? selectedCardIds[0] : null,
+        selectedCardIds,
       }),
-    );
-    return wasAdded;
-  },
-  addRelatedLink: (cardAId, cardBId) => {
-    let wasAdded = false;
-    set((state) =>
-      produce(state, (draft) => {
-        if (!draft.document || cardAId === cardBId) {
-          return;
-        }
-        const cardA = draft.document.cards.find((card) => card.id === cardAId);
-        const cardB = draft.document.cards.find((card) => card.id === cardBId);
-        if (!cardA || !cardB || cardA.isLocked || cardB.isLocked) {
-          return;
-        }
-        const [left, right] = sortedPair(cardAId, cardBId);
-        const exists = draft.document.relatedLinks.some(
-          (link) => link.cardAId === left && link.cardBId === right,
-        );
-        if (exists) {
-          return;
-        }
-        draft.document.relatedLinks.push({
-          id: randomId("related"),
-          canvasId: draft.document.canvas.id,
-          cardAId: left,
-          cardBId: right,
-          createdAt: getNow(),
-        });
-        draft.activeMode = "idle";
-        draft.saveState = "idle";
-        draft.saveError = null;
-        wasAdded = true;
-      }),
-    );
-    return wasAdded;
-  },
-  removeHierarchyLink: (linkId) =>
-    set((state) =>
-      produce(state, (draft) => {
-        if (!draft.document) {
-          return;
-        }
-        draft.document.hierarchyLinks = draft.document.hierarchyLinks.filter(
-          (link) => link.id !== linkId,
-        );
-        recalculateChildCount(draft.document.cards, draft.document.hierarchyLinks);
-        draft.saveState = "idle";
-        draft.saveError = null;
-      }),
-    ),
-  removeRelatedLink: (linkId) =>
-    set((state) =>
-      produce(state, (draft) => {
-        if (!draft.document) {
-          return;
-        }
-        draft.document.relatedLinks = draft.document.relatedLinks.filter(
-          (link) => link.id !== linkId,
-        );
-        draft.saveState = "idle";
-        draft.saveError = null;
-      }),
-    ),
-  toggleCardLock: (cardId) =>
-    set((state) =>
-      produce(state, (draft) => {
-        const card = draft.document?.cards.find((item) => item.id === cardId);
+    toggleCardLock: (cardId) => {
+      updateDocument("カードロック切替", (draft) => {
+        const card = draft.cards.find((item) => item.id === cardId);
         if (!card) {
           return;
         }
         card.isLocked = !card.isLocked;
         card.updatedAt = getNow();
-        draft.saveState = "idle";
-        draft.saveError = null;
-      }),
-    ),
-  bulkSetColor: (cardIds, color) =>
-    set((state) =>
-      produce(state, (draft) => {
-        if (!draft.document) {
+      });
+    },
+    undo: () => {
+      const state = get();
+      const entry = state.history[state.historyIndex];
+      if (!state.document || !entry) {
+        return;
+      }
+      const nextDocument = applyPatches(state.document, entry.inversePatches);
+      set(
+        produce((draft: CanvasEditorState) => {
+          draft.document = nextDocument;
+          draft.historyIndex -= 1;
+          draft.isDirty = true;
+          draft.saveState = "idle";
+          draft.saveError = null;
+          draft.activeMode = "idle";
+          Object.assign(draft, sanitizeSelection(draft));
+        }),
+      );
+    },
+    updateCard: (cardId, updates) => {
+      updateDocument("カード更新", (draft) => {
+        const card = draft.cards.find((item) => item.id === cardId);
+        if (!card || card.isLocked) {
           return;
         }
-        const lockedIncluded = draft.document.cards.some(
-          (card) => cardIds.includes(card.id) && card.isLocked,
-        );
-        if (lockedIncluded) {
-          return;
-        }
-        for (const card of draft.document.cards) {
-          if (cardIds.includes(card.id)) {
-            card.color = color;
-            card.updatedAt = getNow();
-          }
-        }
-        draft.saveState = "idle";
-      }),
-    ),
-  bulkToggleLock: (cardIds, isLocked) =>
-    set((state) =>
-      produce(state, (draft) => {
-        if (!draft.document) {
-          return;
-        }
-        for (const card of draft.document.cards) {
-          if (cardIds.includes(card.id)) {
-            card.isLocked = isLocked;
-            card.updatedAt = getNow();
-          }
-        }
-        draft.saveState = "idle";
-      }),
-    ),
-  bulkDeleteCards: (cardIds) =>
-    set((state) =>
-      produce(state, (draft) => {
-        if (!draft.document) {
-          return;
-        }
-        const lockedIncluded = draft.document.cards.some(
-          (card) => cardIds.includes(card.id) && card.isLocked,
-        );
-        if (lockedIncluded) {
-          return;
-        }
-        draft.document.cards = draft.document.cards.filter((card) => !cardIds.includes(card.id));
-        draft.document.hierarchyLinks = draft.document.hierarchyLinks.filter(
-          (link) => !cardIds.includes(link.parentCardId) && !cardIds.includes(link.childCardId),
-        );
-        draft.document.relatedLinks = draft.document.relatedLinks.filter(
-          (link) => !cardIds.includes(link.cardAId) && !cardIds.includes(link.cardBId),
-        );
-        recalculateChildCount(draft.document.cards, draft.document.hierarchyLinks);
-        draft.selectedCardId = null;
-        draft.selectedCardIds = [];
-        draft.saveState = "idle";
-      }),
-    ),
-  setCanvasName: (name) =>
-    set((state) =>
-      produce(state, (draft) => {
-        if (!draft.document) {
-          return;
-        }
-        draft.document.canvas.name = name.trim();
-        draft.document.canvas.updatedAt = getNow();
-        draft.saveState = "idle";
-      }),
-    ),
-  setNextCardColor: (nextCardColor) => set({ nextCardColor }),
-  setActiveMode: (activeMode) => set({ activeMode }),
-  setSaveState: (saveState, saveError = null) => set({ saveState, saveError }),
-}));
+        Object.assign(card, updates, { updatedAt: getNow() });
+      });
+    },
+  };
+});

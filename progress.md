@@ -125,3 +125,17 @@
   Undo/Redo、自動保存、検索、整列、添付、JSON import/export は未実装。公開 URL を使う直接呼び出しは一覧・保存から除外したが、今後クライアント変異系 API を増やす場合も proxy 経由を前提に統一する必要がある。
 - 次のアクション:
   今回の修正をコミットして push し、ユーザ環境でキャンバス新規作成が通ることを確認したうえで Undo/Redo と自動保存の実装へ進む。
+
+## 2026-04-20 15:05
+- 変更内容:
+  editor store を Immer patches ベースの履歴管理へ拡張し、`undo` / `redo`、dirty 状態、最終保存時刻、保存済みマークを追加した。編集画面には Undo / Redo ボタンと `Ctrl/Cmd + Z`, `Ctrl/Cmd + Y`, `Shift + Cmd/Ctrl + Z`, `Delete/Backspace`, `Escape` のショートカットを追加し、履歴操作が可能な状態にした。
+- 目的:
+  仕様書で要求されているクライアントセッション内の履歴管理を先に成立させ、次段の自動保存と独立して扱える編集基盤を整えるため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/stores/use-canvas-editor-store.ts`、`frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`progress.md`
+- 未解決事項:
+  タイトル・本文・タグ・キャンバス名の入力はまだ毎入力単位で履歴化されうるため、仕様どおりの 500ms デバウンスまたは blur 確定には次段で寄せる必要がある。自動保存も未実装。
+- 次のアクション:
+  この履歴基盤をコミットし、その上で入力のデバウンス確定と 1000ms 無操作時の自動保存を追加する。

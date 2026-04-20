@@ -47,6 +47,10 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const history = useCanvasEditorStore((state) => state.history);
+  const historyIndex = useCanvasEditorStore((state) => state.historyIndex);
+  const isDirty = useCanvasEditorStore((state) => state.isDirty);
+  const lastSavedAt = useCanvasEditorStore((state) => state.lastSavedAt);
   const document = useCanvasEditorStore((state) => state.document);
   const selectedCardId = useCanvasEditorStore((state) => state.selectedCardId);
   const selectedCardIds = useCanvasEditorStore((state) => state.selectedCardIds);
@@ -55,6 +59,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const saveState = useCanvasEditorStore((state) => state.saveState);
   const saveError = useCanvasEditorStore((state) => state.saveError);
   const loadDocument = useCanvasEditorStore((state) => state.loadDocument);
+  const markSaved = useCanvasEditorStore((state) => state.markSaved);
   const selectCard = useCanvasEditorStore((state) => state.selectCard);
   const setSelectedCardIds = useCanvasEditorStore((state) => state.setSelectedCardIds);
   const createCard = useCanvasEditorStore((state) => state.createCard);
@@ -72,6 +77,8 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const setNextCardColor = useCanvasEditorStore((state) => state.setNextCardColor);
   const setActiveMode = useCanvasEditorStore((state) => state.setActiveMode);
   const setSaveState = useCanvasEditorStore((state) => state.setSaveState);
+  const undo = useCanvasEditorStore((state) => state.undo);
+  const redo = useCanvasEditorStore((state) => state.redo);
 
   useEffect(() => {
     loadDocument(initialDocument);
@@ -139,6 +146,61 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       (document?.cards ?? []).some((card) => selectedCardIds.includes(card.id) && card.isLocked),
     [document?.cards, selectedCardIds],
   );
+  const canUndo = historyIndex >= 0;
+  const canRedo = historyIndex < history.length - 1;
+
+  useEffect(() => {
+    function handleKeydown(event: KeyboardEvent) {
+      const target = event.target;
+      const isInputTarget =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
+      const modifierPressed = event.metaKey || event.ctrlKey;
+
+      if (modifierPressed && event.key.toLowerCase() === "z" && !event.shiftKey) {
+        event.preventDefault();
+        undo();
+        setSaveMessage(null);
+        return;
+      }
+
+      if (
+        modifierPressed &&
+        (event.key.toLowerCase() === "y" || (event.shiftKey && event.key.toLowerCase() === "z"))
+      ) {
+        event.preventDefault();
+        redo();
+        setSaveMessage(null);
+        return;
+      }
+
+      if (event.key === "Escape") {
+        setActiveMode("idle");
+        setInteractionMessage(null);
+        return;
+      }
+
+      if (isInputTarget) {
+        return;
+      }
+
+      if ((event.key === "Delete" || event.key === "Backspace") && selectedCardIds.length > 0) {
+        const hasLocked = (document?.cards ?? []).some(
+          (card) => selectedCardIds.includes(card.id) && card.isLocked,
+        );
+        if (hasLocked) {
+          return;
+        }
+        event.preventDefault();
+        bulkDeleteCards(selectedCardIds);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeydown);
+    return () => window.removeEventListener("keydown", handleKeydown);
+  }, [bulkDeleteCards, document?.cards, redo, selectedCardIds, setActiveMode, undo]);
 
   function handleCreateCard(title: string) {
     createCard({
@@ -172,8 +234,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           document.canvas.id,
           document,
         );
-        loadDocument(saved);
-        setSaveState("saved");
+        markSaved(saved.canvas.updatedAt);
         setSaveMessage("保存しました。");
       } catch (error) {
         setSaveState("error", error instanceof Error ? error.message : "保存に失敗しました。");
@@ -240,11 +301,21 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             value={document?.canvas.name ?? ""}
           />
           <p className="muted">
-            カード数: {document?.cards.length ?? 0} / 最終更新:{" "}
-            {document ? formatDate(document.canvas.updatedAt) : "-"}
+            カード数: {document?.cards.length ?? 0} / 保存状態:{" "}
+            {isDirty
+              ? "未保存の変更あり"
+              : lastSavedAt
+                ? `保存済み (${formatDate(lastSavedAt)})`
+                : "-"}
           </p>
         </div>
         <div className="editor-topbar__actions">
+          <button className="button button--ghost" disabled={!canUndo} onClick={undo} type="button">
+            Undo
+          </button>
+          <button className="button button--ghost" disabled={!canRedo} onClick={redo} type="button">
+            Redo
+          </button>
           <button className="button button--accent" onClick={handleSave} type="button">
             {isPending || saveState === "saving" ? "保存中..." : "保存"}
           </button>
