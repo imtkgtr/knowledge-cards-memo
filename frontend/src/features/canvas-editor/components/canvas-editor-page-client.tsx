@@ -17,7 +17,7 @@ import type { CanvasDocument } from "@/lib/api/types";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { useCanvasEditorStore } from "@/stores/use-canvas-editor-store";
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useEffectEvent, useMemo, useState, useTransition } from "react";
 import { CardNode, type KnowledgeCardNode } from "./card-node";
 import { CreateCardModal } from "./create-card-modal";
 
@@ -41,12 +41,23 @@ function findCardLabel(document: CanvasDocument | null, cardId: string) {
   return document?.cards.find((card) => card.id === cardId)?.title || cardId;
 }
 
+function parseTags(value: string) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClientProps) {
   const supabase = createBrowserSupabaseClient();
+  const [bodyDraft, setBodyDraft] = useState("");
+  const [canvasNameDraft, setCanvasNameDraft] = useState(initialDocument.canvas.name);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [tagsDraft, setTagsDraft] = useState("");
+  const [titleDraft, setTitleDraft] = useState("");
   const history = useCanvasEditorStore((state) => state.history);
   const historyIndex = useCanvasEditorStore((state) => state.historyIndex);
   const isDirty = useCanvasEditorStore((state) => state.isDirty);
@@ -150,6 +161,104 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const canRedo = historyIndex < history.length - 1;
 
   useEffect(() => {
+    setCanvasNameDraft(document?.canvas.name ?? "");
+  }, [document?.canvas.name]);
+
+  useEffect(() => {
+    setTitleDraft(selectedCard?.title ?? "");
+    setBodyDraft(selectedCard?.body ?? "");
+    setTagsDraft(selectedCard?.tagNames.join(", ") ?? "");
+  }, [selectedCard?.body, selectedCard?.tagNames, selectedCard?.title]);
+
+  const commitCanvasName = useEffectEvent((value: string) => {
+    const currentName = document?.canvas.name ?? "";
+    const nextName = value.trim();
+    if (!nextName) {
+      setCanvasNameDraft(currentName);
+      return;
+    }
+    if (nextName !== currentName) {
+      setCanvasName(nextName);
+    }
+  });
+
+  const commitCardTitle = useEffectEvent((value: string) => {
+    if (!selectedCard) {
+      return;
+    }
+    const nextTitle = value.trim();
+    if (!nextTitle) {
+      setTitleDraft(selectedCard.title);
+      return;
+    }
+    if (nextTitle !== selectedCard.title) {
+      updateCard(selectedCard.id, { title: nextTitle });
+    }
+  });
+
+  const commitCardBody = useEffectEvent((value: string) => {
+    if (!selectedCard || value === selectedCard.body) {
+      return;
+    }
+    updateCard(selectedCard.id, { body: value });
+  });
+
+  const commitCardTags = useEffectEvent((value: string) => {
+    if (!selectedCard) {
+      return;
+    }
+    const nextTags = parseTags(value);
+    if (nextTags.join(",") === selectedCard.tagNames.join(",")) {
+      return;
+    }
+    updateCard(selectedCard.id, { tagNames: nextTags });
+  });
+
+  useEffect(() => {
+    if (!document) {
+      return;
+    }
+    if (canvasNameDraft.trim() === document.canvas.name) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => commitCanvasName(canvasNameDraft), 500);
+    return () => window.clearTimeout(timeoutId);
+  }, [canvasNameDraft, commitCanvasName, document]);
+
+  useEffect(() => {
+    if (!selectedCard || selectedCard.isLocked) {
+      return;
+    }
+    if (titleDraft.trim() === selectedCard.title) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => commitCardTitle(titleDraft), 500);
+    return () => window.clearTimeout(timeoutId);
+  }, [commitCardTitle, selectedCard, titleDraft]);
+
+  useEffect(() => {
+    if (!selectedCard || selectedCard.isLocked) {
+      return;
+    }
+    if (bodyDraft === selectedCard.body) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => commitCardBody(bodyDraft), 500);
+    return () => window.clearTimeout(timeoutId);
+  }, [bodyDraft, commitCardBody, selectedCard]);
+
+  useEffect(() => {
+    if (!selectedCard || selectedCard.isLocked) {
+      return;
+    }
+    if (parseTags(tagsDraft).join(",") === selectedCard.tagNames.join(",")) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => commitCardTags(tagsDraft), 500);
+    return () => window.clearTimeout(timeoutId);
+  }, [commitCardTags, selectedCard, tagsDraft]);
+
+  useEffect(() => {
     function handleKeydown(event: KeyboardEvent) {
       const target = event.target;
       const isInputTarget =
@@ -202,6 +311,16 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     return () => window.removeEventListener("keydown", handleKeydown);
   }, [bulkDeleteCards, document?.cards, redo, selectedCardIds, setActiveMode, undo]);
 
+  useEffect(() => {
+    if (!document || !isDirty || saveState === "saving") {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      void handleSave(true);
+    }, 1000);
+    return () => window.clearTimeout(timeoutId);
+  }, [document, isDirty, saveState]);
+
   function handleCreateCard(title: string) {
     createCard({
       title,
@@ -212,11 +331,13 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     setInteractionMessage(null);
   }
 
-  async function handleSave() {
+  async function handleSave(isAutoSave = false) {
     if (!document) {
       return;
     }
-    setSaveMessage(null);
+    if (!isAutoSave) {
+      setSaveMessage(null);
+    }
     setSaveState("saving");
     const {
       data: { session },
@@ -235,7 +356,9 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           document,
         );
         markSaved(saved.canvas.updatedAt);
-        setSaveMessage("保存しました。");
+        if (!isAutoSave) {
+          setSaveMessage("保存しました。");
+        }
       } catch (error) {
         setSaveState("error", error instanceof Error ? error.message : "保存に失敗しました。");
       }
@@ -297,16 +420,19 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           <p className="eyebrow">Knowledge Canvas</p>
           <input
             className="editor-topbar__title"
-            onChange={(event) => setCanvasName(event.target.value)}
-            value={document?.canvas.name ?? ""}
+            onBlur={(event) => commitCanvasName(event.target.value)}
+            onChange={(event) => setCanvasNameDraft(event.target.value)}
+            value={canvasNameDraft}
           />
           <p className="muted">
             カード数: {document?.cards.length ?? 0} / 保存状態:{" "}
-            {isDirty
-              ? "未保存の変更あり"
-              : lastSavedAt
-                ? `保存済み (${formatDate(lastSavedAt)})`
-                : "-"}
+            {saveState === "saving"
+              ? "自動保存中..."
+              : isDirty
+                ? "未保存の変更あり"
+                : lastSavedAt
+                  ? `保存済み (${formatDate(lastSavedAt)})`
+                  : "-"}
           </p>
         </div>
         <div className="editor-topbar__actions">
@@ -316,7 +442,13 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           <button className="button button--ghost" disabled={!canRedo} onClick={redo} type="button">
             Redo
           </button>
-          <button className="button button--accent" onClick={handleSave} type="button">
+          <button
+            className="button button--accent"
+            onClick={() => {
+              void handleSave();
+            }}
+            type="button"
+          >
             {isPending || saveState === "saving" ? "保存中..." : "保存"}
           </button>
           <Link className="button button--ghost" href="/canvases">
@@ -469,8 +601,9 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                 <input
                   className="input"
                   disabled={selectedCard.isLocked}
-                  onChange={(event) => updateCard(selectedCard.id, { title: event.target.value })}
-                  value={selectedCard.title}
+                  onBlur={(event) => commitCardTitle(event.target.value)}
+                  onChange={(event) => setTitleDraft(event.target.value)}
+                  value={titleDraft}
                 />
               </label>
               <label className="field">
@@ -478,8 +611,9 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                 <textarea
                   className="textarea"
                   disabled={selectedCard.isLocked}
-                  onChange={(event) => updateCard(selectedCard.id, { body: event.target.value })}
-                  value={selectedCard.body}
+                  onBlur={(event) => commitCardBody(event.target.value)}
+                  onChange={(event) => setBodyDraft(event.target.value)}
+                  value={bodyDraft}
                 />
               </label>
               <label className="field">
@@ -487,15 +621,9 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                 <input
                   className="input"
                   disabled={selectedCard.isLocked}
-                  onChange={(event) =>
-                    updateCard(selectedCard.id, {
-                      tagNames: event.target.value
-                        .split(",")
-                        .map((value) => value.trim())
-                        .filter(Boolean),
-                    })
-                  }
-                  value={selectedCard.tagNames.join(", ")}
+                  onBlur={(event) => commitCardTags(event.target.value)}
+                  onChange={(event) => setTagsDraft(event.target.value)}
+                  value={tagsDraft}
                 />
               </label>
               <div className="field">
