@@ -1,6 +1,6 @@
 "use client";
 
-import type { CanvasDocument, Card, HierarchyLink } from "@/lib/api/types";
+import type { Attachment, CanvasDocument, Card, HierarchyLink } from "@/lib/api/types";
 import { type Patch, applyPatches, enablePatches, produce, produceWithPatches } from "immer";
 import { create } from "zustand";
 
@@ -30,6 +30,7 @@ type CanvasEditorState = {
   selectedCardIds: string[];
   addHierarchyLink: (parentCardId: string, childCardId: string) => boolean;
   addRelatedLink: (cardAId: string, cardBId: string) => boolean;
+  appendAttachment: (attachment: Attachment) => void;
   applyCardLayout: (positions: Record<string, { x: number; y: number }>) => boolean;
   bulkDeleteCards: (cardIds: string[]) => void;
   bulkSetColor: (cardIds: string[], color: string) => void;
@@ -41,6 +42,7 @@ type CanvasEditorState = {
   redo: () => void;
   removeHierarchyLink: (linkId: string) => void;
   removeRelatedLink: (linkId: string) => void;
+  removeAttachment: (attachmentId: string) => void;
   selectCard: (cardId: string | null) => void;
   setActiveMode: (mode: ActiveMode) => void;
   setCanvasName: (name: string) => void;
@@ -246,6 +248,16 @@ export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
           draft.activeMode = "idle";
         },
       ),
+    appendAttachment: (attachment) => {
+      set(
+        produce((draft: CanvasEditorState) => {
+          if (!draft.document) {
+            return;
+          }
+          draft.document.attachments.push(attachment);
+        }),
+      );
+    },
     applyCardLayout: (positions) =>
       updateDocument("カード整列", (draft) => {
         let didChange = false;
@@ -407,6 +419,18 @@ export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
       updateDocument("通常リンク削除", (draft) => {
         draft.relatedLinks = draft.relatedLinks.filter((link) => link.id !== linkId);
       });
+    },
+    removeAttachment: (attachmentId) => {
+      set(
+        produce((draft: CanvasEditorState) => {
+          if (!draft.document) {
+            return;
+          }
+          draft.document.attachments = draft.document.attachments.filter(
+            (attachment) => attachment.id !== attachmentId,
+          );
+        }),
+      );
     },
     selectCard: (selectedCardId) =>
       set({

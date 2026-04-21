@@ -384,6 +384,12 @@ input {
   gap: 10px;
 }
 
+.detail-links__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .detail-links h3 {
   margin: 0;
   font-size: 1rem;

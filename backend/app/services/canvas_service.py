@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from uuid import uuid4
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, UploadFile, status
 from postgrest.exceptions import APIError
 from pydantic import ValidationError
 
 from app.core.auth import AuthenticatedUser, get_current_user
 from app.infrastructure.canvas_repository import CanvasRepository, get_canvas_repository
 from app.schemas.canvas import (
+    AttachmentSchema,
+    AttachmentResponse,
+    AttachmentAccessResponse,
     CanvasExportSchema,
     CanvasDocumentSchema,
     CanvasSchema,
@@ -26,6 +30,10 @@ from app.schemas.canvas import (
 @dataclass(slots=True)
 class CanvasService:
     repository: CanvasRepository
+
+    max_attachments_per_card: int = 10
+    max_attachment_total_size_bytes: int = 10 * 1024 * 1024
+    attachment_url_expires_in: int = 3600
 
     def list_canvases(self, user: AuthenticatedUser) -> list[CanvasSummarySchema]:
         return self._with_storage_guard(
@@ -188,6 +196,86 @@ class CanvasService:
             created_at=saved.canvas.created_at,
         )
 
+    def add_attachment(
+        self,
+        user: AuthenticatedUser,
+        canvas_id: str,
+        card_id: str,
+        upload_file: UploadFile,
+        file_bytes: bytes,
+    ) -> AttachmentSchema:
+        file_name = Path(upload_file.filename or "").name
+        if not file_name:
+            raise self._invalid_payload("添付ファイル名が不正です。")
+        mime_type = upload_file.content_type or "application/octet-stream"
+        kind = self._resolve_attachment_kind(file_name=file_name, mime_type=mime_type)
+        existing = self._with_storage_guard(
+            lambda: self._prepare_profile_and_run(
+                user,
+                lambda: self.repository.list_attachments_for_card(user.id, canvas_id, card_id),
+            )
+        )
+        if existing is None:
+            raise self._card_not_found()
+        if len(existing) >= self.max_attachments_per_card:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"code": "attachment_limit_exceeded", "message": "1 カードに添付できるのは 10 件までです。"},
+            )
+        size_bytes = len(file_bytes)
+        total_size = size_bytes + sum(item.size_bytes for item in existing)
+        if total_size > self.max_attachment_total_size_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={
+                    "code": "attachment_total_size_exceeded",
+                    "message": "添付ファイルの合計サイズは 10MB までです。",
+                },
+            )
+        attachment = self._with_storage_guard(
+            lambda: self._prepare_profile_and_run(
+                user,
+                lambda: self.repository.add_attachment(
+                    user.id,
+                    canvas_id,
+                    card_id,
+                    file_name,
+                    mime_type,
+                    size_bytes,
+                    kind,
+                    file_bytes,
+                ),
+            )
+        )
+        if attachment is None:
+            raise self._card_not_found()
+        return attachment
+
+    def delete_attachment(self, user: AuthenticatedUser, attachment_id: str) -> None:
+        deleted = self._with_storage_guard(
+            lambda: self._prepare_profile_and_run(
+                user,
+                lambda: self.repository.delete_attachment(user.id, attachment_id),
+            )
+        )
+        if not deleted:
+            raise self._attachment_not_found()
+
+    def get_attachment_access(self, user: AuthenticatedUser, attachment_id: str) -> AttachmentAccessResponse:
+        url = self._with_storage_guard(
+            lambda: self._prepare_profile_and_run(
+                user,
+                lambda: self.repository.get_attachment_access_url(
+                    user.id,
+                    attachment_id,
+                    self.attachment_url_expires_in,
+                ),
+            )
+        )
+        if url is None:
+            raise self._attachment_not_found()
+        return AttachmentAccessResponse(url=url, expires_in=self.attachment_url_expires_in)
+
     def _prepare_profile_and_run(self, user: AuthenticatedUser, callback):
         self.repository.ensure_profile(user.id, user.email)
         return callback()
@@ -205,6 +293,20 @@ class CanvasService:
         if export_payload.version != "1.0":
             raise self._invalid_payload("未対応の JSON version です。")
         return export_payload
+
+    @staticmethod
+    def _resolve_attachment_kind(file_name: str, mime_type: str) -> str:
+        suffix = Path(file_name).suffix.lower()
+        if mime_type.startswith("image/") and suffix in {".png", ".jpg", ".jpeg", ".webp"}:
+            return "image"
+        if mime_type == "application/pdf" and suffix == ".pdf":
+            return "pdf"
+        if mime_type.startswith("text/plain") and suffix == ".txt":
+            return "txt"
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "invalid_payload", "message": "添付できるのは画像・PDF・TXT のみです。"},
+        )
 
     @staticmethod
     def _with_storage_guard(callback):
@@ -305,6 +407,20 @@ class CanvasService:
         return HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"code": "canvas_not_found", "message": "キャンバスが見つかりません。"},
+        )
+
+    @staticmethod
+    def _card_not_found() -> HTTPException:
+        return HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "card_not_found", "message": "カードが見つかりません。"},
+        )
+
+    @staticmethod
+    def _attachment_not_found() -> HTTPException:
+        return HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "attachment_not_found", "message": "添付ファイルが見つかりません。"},
         )
 
 

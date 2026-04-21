@@ -1,4 +1,4 @@
-import type { CanvasDocument, CanvasExportPayload, CanvasSummary } from "./types";
+import type { Attachment, CanvasDocument, CanvasExportPayload, CanvasSummary } from "./types";
 
 const browserProxyBasePath = "/api/backend";
 
@@ -130,4 +130,73 @@ export async function clientImportCanvas(
 
   const data = (await response.json()) as { canvas: CanvasSummary };
   return data.canvas;
+}
+
+export async function clientUploadAttachment(
+  accessToken: string,
+  canvasId: string,
+  cardId: string,
+  file: File,
+): Promise<Attachment> {
+  const formData = new FormData();
+  formData.set("cardId", cardId);
+  formData.set("file", file);
+
+  const response = await fetch(getBrowserProxyPath(`/canvases/${canvasId}/attachments`), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      detail?: { message?: string };
+    } | null;
+    throw new Error(payload?.detail?.message ?? "添付ファイルの追加に失敗しました。");
+  }
+
+  const data = (await response.json()) as { attachment: Attachment };
+  return data.attachment;
+}
+
+export async function clientDeleteAttachment(
+  accessToken: string,
+  attachmentId: string,
+): Promise<void> {
+  const response = await fetch(getBrowserProxyPath(`/attachments/${attachmentId}`), {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      detail?: { message?: string };
+    } | null;
+    throw new Error(payload?.detail?.message ?? "添付ファイルの削除に失敗しました。");
+  }
+}
+
+export async function clientGetAttachmentAccessUrl(
+  accessToken: string,
+  attachmentId: string,
+): Promise<string> {
+  const response = await fetch(getBrowserProxyPath(`/attachments/${attachmentId}/access`), {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      detail?: { message?: string };
+    } | null;
+    throw new Error(payload?.detail?.message ?? "添付ファイル URL の取得に失敗しました。");
+  }
+
+  const data = (await response.json()) as { url: string };
+  return data.url;
 }

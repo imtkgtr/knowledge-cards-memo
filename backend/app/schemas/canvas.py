@@ -62,6 +62,7 @@ class AttachmentSchema(CamelModel):
     mime_type: str
     size_bytes: int
     kind: str
+    storage_path: str
     created_at: datetime
 
 
@@ -102,6 +103,15 @@ class CanvasResponse(CamelModel):
 
 class CanvasDocumentResponse(CamelModel):
     canvas: CanvasDocumentSchema
+
+
+class AttachmentResponse(CamelModel):
+    attachment: AttachmentSchema
+
+
+class AttachmentAccessResponse(CamelModel):
+    url: str
+    expires_in: int
 
 
 class SaveCanvasDocumentRequest(CamelModel):

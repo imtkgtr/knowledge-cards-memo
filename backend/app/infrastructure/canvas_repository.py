@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Protocol
 from uuid import uuid4
 
@@ -48,6 +49,37 @@ class CanvasRepository(Protocol):
         canvas_id: str,
         payload: SaveCanvasDocumentRequest,
     ) -> CanvasDocumentSchema | None: ...
+
+    def list_attachments_for_card(
+        self,
+        user_id: str,
+        canvas_id: str,
+        card_id: str,
+    ) -> list[AttachmentSchema] | None: ...
+
+    def add_attachment(
+        self,
+        user_id: str,
+        canvas_id: str,
+        card_id: str,
+        file_name: str,
+        mime_type: str,
+        size_bytes: int,
+        kind: str,
+        file_bytes: bytes,
+    ) -> AttachmentSchema | None: ...
+
+    def delete_attachment(self, user_id: str, attachment_id: str) -> bool: ...
+
+    def get_attachment_access_url(
+        self,
+        user_id: str,
+        attachment_id: str,
+        expires_in: int,
+    ) -> str | None: ...
+
+
+ATTACHMENT_BUCKET_NAME = "card-attachments"
 
 
 @dataclass(slots=True)
@@ -331,6 +363,93 @@ class SupabaseCanvasRepository:
 
         return self.get_canvas_document(user_id, canvas_id)
 
+    def list_attachments_for_card(
+        self,
+        user_id: str,
+        canvas_id: str,
+        card_id: str,
+    ) -> list[AttachmentSchema] | None:
+        card = self._get_card_row_for_canvas(user_id, canvas_id, card_id)
+        if card is None:
+            return None
+        response = (
+            self.client.table("card_attachments")
+            .select("*")
+            .eq("card_id", card_id)
+            .order("created_at")
+            .execute()
+        )
+        return [AttachmentSchema.model_validate(row) for row in response.data or []]
+
+    def add_attachment(
+        self,
+        user_id: str,
+        canvas_id: str,
+        card_id: str,
+        file_name: str,
+        mime_type: str,
+        size_bytes: int,
+        kind: str,
+        file_bytes: bytes,
+    ) -> AttachmentSchema | None:
+        card = self._get_card_row_for_canvas(user_id, canvas_id, card_id)
+        if card is None:
+            return None
+
+        attachment_id = str(uuid4())
+        storage_path = self._build_attachment_path(
+            user_id=user_id,
+            canvas_id=canvas_id,
+            card_id=card_id,
+            attachment_id=attachment_id,
+            file_name=file_name,
+        )
+        self._ensure_attachment_bucket()
+        self.client.storage.from_(ATTACHMENT_BUCKET_NAME).upload(
+            storage_path,
+            file_bytes,
+            {"content-type": mime_type, "x-upsert": "false"},
+        )
+        response = (
+            self.client.table("card_attachments")
+            .insert(
+                {
+                    "id": attachment_id,
+                    "card_id": card_id,
+                    "storage_path": storage_path,
+                    "file_name": file_name,
+                    "mime_type": mime_type,
+                    "size_bytes": size_bytes,
+                    "kind": kind,
+                }
+            )
+            .execute()
+        )
+        return AttachmentSchema.model_validate(response.data[0])
+
+    def delete_attachment(self, user_id: str, attachment_id: str) -> bool:
+        attachment = self._get_attachment_row(user_id, attachment_id)
+        if attachment is None:
+            return False
+        self.client.storage.from_(ATTACHMENT_BUCKET_NAME).remove([attachment["storage_path"]])
+        response = self.client.table("card_attachments").delete().eq("id", attachment_id).execute()
+        return bool(response.data)
+
+    def get_attachment_access_url(
+        self,
+        user_id: str,
+        attachment_id: str,
+        expires_in: int,
+    ) -> str | None:
+        attachment = self._get_attachment_row(user_id, attachment_id)
+        if attachment is None:
+            return None
+        response = self.client.storage.from_(ATTACHMENT_BUCKET_NAME).create_signed_url(
+            attachment["storage_path"],
+            expires_in,
+        )
+        return response["signedURL"]
+
     def _get_canvas_row(self, user_id: str, canvas_id: str) -> dict | None:
         response = (
             self.client.table("canvases")
@@ -341,6 +460,73 @@ class SupabaseCanvasRepository:
             .execute()
         )
         return response.data[0] if response.data else None
+
+    def _get_card_row_for_canvas(self, user_id: str, canvas_id: str, card_id: str) -> dict | None:
+        canvas = self._get_canvas_row(user_id, canvas_id)
+        if canvas is None:
+            return None
+        response = (
+            self.client.table("cards")
+            .select("*")
+            .eq("id", card_id)
+            .eq("canvas_id", canvas_id)
+            .limit(1)
+            .execute()
+        )
+        return response.data[0] if response.data else None
+
+    def _get_attachment_row(self, user_id: str, attachment_id: str) -> dict | None:
+        response = (
+            self.client.table("card_attachments")
+            .select("*")
+            .eq("id", attachment_id)
+            .limit(1)
+            .execute()
+        )
+        attachment = response.data[0] if response.data else None
+        if attachment is None:
+            return None
+        card = (
+            self.client.table("cards")
+            .select("id, canvas_id")
+            .eq("id", attachment["card_id"])
+            .limit(1)
+            .execute()
+        )
+        card_row = card.data[0] if card.data else None
+        if card_row is None:
+            return None
+        canvas = self._get_canvas_row(user_id, card_row["canvas_id"])
+        if canvas is None:
+            return None
+        return attachment
+
+    def _ensure_attachment_bucket(self) -> None:
+        try:
+            self.client.storage.get_bucket(ATTACHMENT_BUCKET_NAME)
+        except Exception:
+            self.client.storage.create_bucket(
+                ATTACHMENT_BUCKET_NAME,
+                options={
+                    "public": False,
+                    "file_size_limit": 10 * 1024 * 1024,
+                    "allowed_mime_types": ["image/png", "image/jpeg", "image/webp", "application/pdf", "text/plain"],
+                },
+            )
+
+    @staticmethod
+    def _build_attachment_path(
+        user_id: str,
+        canvas_id: str,
+        card_id: str,
+        attachment_id: str,
+        file_name: str,
+    ) -> str:
+        sanitized_name = "".join(
+            char if char.isalnum() or char in {".", "-", "_"} else "-"
+            for char in Path(file_name).name
+        )
+        return f"{user_id}/{canvas_id}/{card_id}/{attachment_id}-{sanitized_name}"
 
     @staticmethod
     def _to_canvas_schema(row: dict) -> CanvasSchema:
@@ -470,6 +656,75 @@ class MemoryCanvasRepository:
         self.hierarchy_links[canvas_id] = [link.model_dump() for link in payload.hierarchy_links]
         self.related_links[canvas_id] = [link.model_dump() for link in payload.related_links]
         return self.get_canvas_document(user_id, canvas_id)
+
+    def list_attachments_for_card(
+        self,
+        user_id: str,
+        canvas_id: str,
+        card_id: str,
+    ) -> list[AttachmentSchema] | None:
+        row = self.canvases.get(canvas_id)
+        if row is None or row["user_id"] != user_id:
+            return None
+        attachments = [
+            item for item in self.attachments.get(canvas_id, []) if item["card_id"] == card_id
+        ]
+        return [AttachmentSchema.model_validate(item) for item in attachments]
+
+    def add_attachment(
+        self,
+        user_id: str,
+        canvas_id: str,
+        card_id: str,
+        file_name: str,
+        mime_type: str,
+        size_bytes: int,
+        kind: str,
+        file_bytes: bytes,
+    ) -> AttachmentSchema | None:
+        row = self.canvases.get(canvas_id)
+        if row is None or row["user_id"] != user_id:
+            return None
+        if not any(card["id"] == card_id for card in self.cards.get(canvas_id, [])):
+            return None
+        attachment = {
+            "id": str(uuid4()),
+            "card_id": card_id,
+            "storage_path": f"memory/{canvas_id}/{card_id}/{file_name}",
+            "file_name": file_name,
+            "mime_type": mime_type,
+            "size_bytes": size_bytes,
+            "kind": kind,
+            "created_at": datetime.now(tz=UTC),
+        }
+        self.attachments[canvas_id].append(attachment)
+        return AttachmentSchema.model_validate(attachment)
+
+    def delete_attachment(self, user_id: str, attachment_id: str) -> bool:
+        for canvas_id, items in self.attachments.items():
+            row = self.canvases.get(canvas_id)
+            if row is None or row["user_id"] != user_id:
+                continue
+            for index, item in enumerate(items):
+                if item["id"] == attachment_id:
+                    del items[index]
+                    return True
+        return False
+
+    def get_attachment_access_url(
+        self,
+        user_id: str,
+        attachment_id: str,
+        expires_in: int,
+    ) -> str | None:
+        for canvas_id, items in self.attachments.items():
+            row = self.canvases.get(canvas_id)
+            if row is None or row["user_id"] != user_id:
+                continue
+            for item in items:
+                if item["id"] == attachment_id:
+                    return f"https://example.test/attachments/{attachment_id}?expires_in={expires_in}"
+        return None
 
 
 def build_memory_canvas_repository() -> MemoryCanvasRepository:

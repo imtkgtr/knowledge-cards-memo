@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, File, Form, Response, UploadFile, status
 
 from app.core.auth import AuthenticatedUser, get_current_user
 from app.schemas.canvas import (
+    AttachmentResponse,
     CanvasExportSchema,
     CanvasDocumentResponse,
     CanvasResponse,
@@ -108,3 +109,19 @@ def import_canvas(
 ) -> CanvasSummaryResponse:
     imported = service.import_canvas(user, payload)
     return CanvasSummaryResponse(canvas=imported)
+
+
+@router.post(
+    "/{canvas_id}/attachments",
+    response_model=AttachmentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_attachment(
+    canvas_id: str,
+    card_id: str = Form(..., alias="cardId"),
+    file: UploadFile = File(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    service: CanvasService = Depends(get_canvas_service),
+) -> AttachmentResponse:
+    attachment = service.add_attachment(user, canvas_id, card_id, file, await file.read())
+    return AttachmentResponse(attachment=attachment)

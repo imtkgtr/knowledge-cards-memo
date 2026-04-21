@@ -13,12 +13,17 @@ import {
   useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { clientSaveCanvasDocument } from "@/lib/api/backend";
+import {
+  clientDeleteAttachment,
+  clientGetAttachmentAccessUrl,
+  clientSaveCanvasDocument,
+  clientUploadAttachment,
+} from "@/lib/api/backend";
 import type { CanvasDocument } from "@/lib/api/types";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { useCanvasEditorStore } from "@/stores/use-canvas-editor-store";
 import Link from "next/link";
-import { useEffect, useEffectEvent, useMemo, useState, useTransition } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState, useTransition } from "react";
 import { buildDagreLayout } from "../lib/apply-dagre-layout";
 import { CardNode, type KnowledgeCardNode } from "./card-node";
 import { CreateCardModal } from "./create-card-modal";
@@ -62,8 +67,10 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [searchQuery, setSearchQuery] = useState("");
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isAttachmentPending, setIsAttachmentPending] = useState(false);
   const [tagsDraft, setTagsDraft] = useState("");
   const [titleDraft, setTitleDraft] = useState("");
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<
     KnowledgeCardNode,
     Edge
@@ -88,9 +95,11 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const moveCard = useCanvasEditorStore((state) => state.moveCard);
   const addHierarchyLink = useCanvasEditorStore((state) => state.addHierarchyLink);
   const addRelatedLink = useCanvasEditorStore((state) => state.addRelatedLink);
+  const appendAttachment = useCanvasEditorStore((state) => state.appendAttachment);
   const applyCardLayout = useCanvasEditorStore((state) => state.applyCardLayout);
   const removeHierarchyLink = useCanvasEditorStore((state) => state.removeHierarchyLink);
   const removeRelatedLink = useCanvasEditorStore((state) => state.removeRelatedLink);
+  const removeAttachment = useCanvasEditorStore((state) => state.removeAttachment);
   const toggleCardLock = useCanvasEditorStore((state) => state.toggleCardLock);
   const bulkSetColor = useCanvasEditorStore((state) => state.bulkSetColor);
   const bulkToggleLock = useCanvasEditorStore((state) => state.bulkToggleLock);
@@ -217,6 +226,11 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   }, [document?.cards, searchQuery]);
   const canUndo = historyIndex >= 0;
   const canRedo = historyIndex < history.length - 1;
+  const selectedAttachments = useMemo(
+    () =>
+      (document?.attachments ?? []).filter((attachment) => attachment.cardId === selectedCard?.id),
+    [document?.attachments, selectedCard?.id],
+  );
 
   useEffect(() => {
     setCanvasNameDraft(document?.canvas.name ?? "");
@@ -526,6 +540,81 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         ? "カードを自動整列しました。ロック中のカードは固定しています。"
         : "整列対象のカード位置に変更はありませんでした。",
     );
+  }
+
+  async function getAccessToken() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    return session?.access_token ?? null;
+  }
+
+  async function handleAttachmentFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !document || !selectedCard) {
+      return;
+    }
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setInteractionMessage("セッションが切れています。再ログインしてください。");
+      return;
+    }
+
+    setIsAttachmentPending(true);
+    try {
+      const attachment = await clientUploadAttachment(
+        accessToken,
+        document.canvas.id,
+        selectedCard.id,
+        file,
+      );
+      appendAttachment(attachment);
+      setInteractionMessage(`添付「${attachment.fileName}」を追加しました。`);
+    } catch (error) {
+      setInteractionMessage(
+        error instanceof Error ? error.message : "添付ファイルの追加に失敗しました。",
+      );
+    } finally {
+      setIsAttachmentPending(false);
+    }
+  }
+
+  async function handleAttachmentOpen(attachmentId: string) {
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setInteractionMessage("セッションが切れています。再ログインしてください。");
+      return;
+    }
+    try {
+      const url = await clientGetAttachmentAccessUrl(accessToken, attachmentId);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      setInteractionMessage(
+        error instanceof Error ? error.message : "添付ファイル URL の取得に失敗しました。",
+      );
+    }
+  }
+
+  async function handleAttachmentDelete(attachmentId: string) {
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setInteractionMessage("セッションが切れています。再ログインしてください。");
+      return;
+    }
+    setIsAttachmentPending(true);
+    try {
+      await clientDeleteAttachment(accessToken, attachmentId);
+      removeAttachment(attachmentId);
+      setInteractionMessage("添付ファイルを削除しました。");
+    } catch (error) {
+      setInteractionMessage(
+        error instanceof Error ? error.message : "添付ファイルの削除に失敗しました。",
+      );
+    } finally {
+      setIsAttachmentPending(false);
+    }
   }
 
   return (
@@ -907,6 +996,55 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                   </ul>
                 ) : (
                   <p className="muted">リンクはありません。</p>
+                )}
+              </section>
+              <section className="detail-links">
+                <h3>添付</h3>
+                <input
+                  accept="image/png,image/jpeg,image/webp,application/pdf,text/plain,.txt"
+                  className="sr-only"
+                  disabled={selectedCard.isLocked || isAttachmentPending}
+                  onChange={handleAttachmentFileChange}
+                  ref={attachmentInputRef}
+                  type="file"
+                />
+                <button
+                  className="button button--ghost"
+                  disabled={selectedCard.isLocked || isAttachmentPending}
+                  onClick={() => attachmentInputRef.current?.click()}
+                  type="button"
+                >
+                  {isAttachmentPending ? "添付中..." : "添付追加"}
+                </button>
+                {selectedAttachments.length ? (
+                  <ul>
+                    {selectedAttachments.map((attachment) => (
+                      <li key={attachment.id}>
+                        <span>
+                          [{attachment.kind}] {attachment.fileName}
+                        </span>
+                        <div className="detail-links__actions">
+                          <button
+                            className="button button--ghost"
+                            onClick={() => handleAttachmentOpen(attachment.id)}
+                            type="button"
+                          >
+                            開く
+                          </button>
+                          <button
+                            className="button button--ghost"
+                            disabled={selectedCard.isLocked || isAttachmentPending}
+                            onClick={() => handleAttachmentDelete(attachment.id)}
+                            type="button"
+                          >
+                            削除
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="muted">添付はありません。</p>
                 )}
               </section>
             </div>

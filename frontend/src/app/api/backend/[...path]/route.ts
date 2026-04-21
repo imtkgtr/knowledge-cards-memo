@@ -17,7 +17,7 @@ async function proxyRequest(
   const contentType = request.headers.get("content-type");
   const authorization = request.headers.get("authorization");
   const body =
-    request.method === "GET" || request.method === "HEAD" ? undefined : await request.text();
+    request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer();
 
   const response = await fetch(buildTargetUrl(request, path), {
     method: request.method,

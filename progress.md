@@ -265,3 +265,17 @@
   添付、サムネイルは未実装。整列には専用テストがまだなく、今回は `bun run lint` と `bun run build` による確認に留めている。複数ロックカードがある場合は先頭アンカー基準のため、厳密な最適配置ではない。
 - 次のアクション:
   この整列機能をコミットして push し、その後は添付 upload / access URL の実装へ進む。
+
+## 2026-04-21 01:34
+- 変更内容:
+  backend に添付 API を追加し、`POST /api/canvases/{canvasId}/attachments`、`GET /api/attachments/{attachmentId}/access`、`DELETE /api/attachments/{attachmentId}` を実装した。Storage には `card-attachments` バケットを使い、初回 upload 時に backend 側で bucket を自動作成する。frontend の右パネルには添付追加、開く、削除を追加し、editor document に添付 metadata を同期するようにした。proxy route は `multipart/form-data` を壊さないよう `arrayBuffer()` 転送へ変更した。
+- 目的:
+  仕様で定義された MVP 添付機能を通し、カード単位で画像 / PDF / TXT を保持・参照できる状態にするため。
+- 影響範囲:
+  `backend/`、`frontend/`、`progress.md`
+- 関連ファイル:
+  `backend/app/api/routes/canvases.py`、`backend/app/api/routes/attachments.py`、`backend/app/api/router.py`、`backend/app/services/canvas_service.py`、`backend/app/infrastructure/canvas_repository.py`、`backend/app/schemas/canvas.py`、`backend/tests/test_canvases.py`、`backend/pyproject.toml`、`backend/uv.lock`、`frontend/src/app/api/backend/[...path]/route.ts`、`frontend/src/lib/api/backend.ts`、`frontend/src/lib/api/types.ts`、`frontend/src/stores/use-canvas-editor-store.ts`、`frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/app/globals.css`、`progress.md`
+- 未解決事項:
+  一覧サムネイル更新は未実装。画像の右パネル内プレビューはまだなく、現状は署名 URL を新規タブで開く方式。Storage bucket を migration で事前作成する構成にはまだしていないため、初回 upload 時に backend が bucket 作成権限を持っている前提になる。
+- 次のアクション:
+  この添付機能をコミットして push し、その後はサムネイル更新か画像プレビューのどちらかへ進む。

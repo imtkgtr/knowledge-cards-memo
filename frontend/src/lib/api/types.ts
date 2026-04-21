@@ -50,8 +50,10 @@ export type RelatedLink = {
 export type Attachment = {
   id: string;
   cardId: string;
-  kind: "image" | "pdf" | "text";
+  kind: "image" | "pdf" | "txt";
   fileName: string;
+  mimeType: string;
+  sizeBytes: number;
   storagePath: string;
   createdAt: string;
 };

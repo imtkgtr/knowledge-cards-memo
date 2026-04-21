@@ -363,3 +363,64 @@ def test_import_canvas_rejects_attachments() -> None:
 
     assert import_response.status_code == 422
     assert import_response.json()["detail"]["code"] == "invalid_payload"
+
+
+def test_attachment_crud_flow() -> None:
+    context = build_test_context()
+    created = context.client.post("/api/canvases", json={"name": "添付テスト"}).json()["canvas"]
+    canvas_id = created["id"]
+
+    context.client.put(
+        f"/api/canvases/{canvas_id}/document",
+        json={
+            "canvas": {
+                "id": canvas_id,
+                "name": "添付テスト",
+                "backgroundColor": "#ffffff",
+                "gridEnabled": False,
+                "duplicateWarningSuppressed": False,
+                "createdAt": created["createdAt"],
+                "updatedAt": created["updatedAt"],
+            },
+            "cards": [
+                {
+                    "id": "card-1",
+                    "canvasId": canvas_id,
+                    "title": "ノード 1",
+                    "body": "",
+                    "tagNames": [],
+                    "color": "#eed9b6",
+                    "isLocked": False,
+                    "x": 10,
+                    "y": 20,
+                    "childCount": 0,
+                    "createdAt": created["createdAt"],
+                    "updatedAt": created["updatedAt"],
+                }
+            ],
+            "hierarchyLinks": [],
+            "relatedLinks": [],
+            "attachments": [],
+        },
+    )
+
+    upload_response = context.client.post(
+        f"/api/canvases/{canvas_id}/attachments",
+        data={"cardId": "card-1"},
+        files={"file": ("memo.txt", b"knowledge canvas", "text/plain")},
+    )
+    assert upload_response.status_code == 201
+    attachment = upload_response.json()["attachment"]
+    assert attachment["fileName"] == "memo.txt"
+    assert attachment["kind"] == "txt"
+
+    document_response = context.client.get(f"/api/canvases/{canvas_id}/document")
+    assert document_response.status_code == 200
+    assert len(document_response.json()["canvas"]["attachments"]) == 1
+
+    access_response = context.client.get(f"/api/attachments/{attachment['id']}/access")
+    assert access_response.status_code == 200
+    assert attachment["id"] in access_response.json()["url"]
+
+    delete_response = context.client.delete(f"/api/attachments/{attachment['id']}")
+    assert delete_response.status_code == 204
