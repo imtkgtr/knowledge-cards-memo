@@ -274,7 +274,7 @@ input {
 .editor-layout {
   min-height: calc(100vh - 200px);
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr) 320px;
+  grid-template-columns: 160px minmax(0, 1fr) 260px;
   gap: 12px;
 }
 
@@ -297,11 +297,11 @@ input {
 }
 
 .editor-resizer--palette {
-  right: -8px;
+  right: 0;
 }
 
 .editor-resizer--detail {
-  left: -8px;
+  left: 0;
 }
 
 .selection-toolbar {
@@ -400,7 +400,7 @@ input {
 }
 
 .editor-detail {
-  overflow: auto;
+  overflow: visible;
 }
 
 .detail-panel {

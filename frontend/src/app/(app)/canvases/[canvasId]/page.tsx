@@ -1,4 +1,4 @@
-import { CanvasEditorPageClient } from "@/features/canvas-editor/components/canvas-editor-page-client";
+import { CanvasEditorPageShell } from "@/features/canvas-editor/components/canvas-editor-page-shell";
 import { serverFetchCanvasDocument } from "@/lib/api/backend";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -21,5 +21,5 @@ export default async function CanvasEditorPage({ params }: CanvasEditorPageProps
 
   const document = await serverFetchCanvasDocument(session.access_token, canvasId);
 
-  return <CanvasEditorPageClient initialDocument={document} />;
+  return <CanvasEditorPageShell initialDocument={document} />;
 }

@@ -503,3 +503,17 @@
   本文は plain text ベースへ戻したため、Notion のようなブロック編集はまだ未実装。今後本当に Notion ライクな本文編集を狙うなら、別コンポーネントとしてエディタを切り出す必要がある。
 - 次のアクション:
   `bun run lint` と `bun run build` の通過を確認したうえでコミットし、実ブラウザでリンク追加中の視点保持、パネル縮小量、端子位置、本文編集感を再確認する。
+
+## 2026-04-22 00:08
+- 変更内容:
+  キャンバス編集ページに client-only の薄い wrapper を追加し、エディタ本体を SSR しない構成へ変更した。これにより、最近続いていた hydration mismatch を避けやすくした。あわせて、左右パネル幅の `localStorage` 永続化をいったん外し、既定幅と最小・最大幅を見直した。リサイズ把手はパネル内側の端へ寄せ、右詳細パネルの `overflow` による掴みにくさも軽減した。
+- 目的:
+  SSR と client 初期描画のズレで editor が壊れる問題を止めつつ、右パネルが大きすぎる・把手が掴めないという実用上の不具合を先に解消するため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/app/(app)/canvases/[canvasId]/page.tsx`、`frontend/src/features/canvas-editor/components/canvas-editor-page-shell.tsx`、`frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/app/globals.css`、`progress.md`
+- 未解決事項:
+  editor を client-only にしたため、初回表示は SSR 時より少し遅く見える可能性がある。必要なら後で skeleton や loading を追加する。
+- 次のアクション:
+  `bun run lint` と `bun run build` の通過を確認したうえでコミットし、実ブラウザで hydration エラー消失とパネルリサイズ可否を再確認する。

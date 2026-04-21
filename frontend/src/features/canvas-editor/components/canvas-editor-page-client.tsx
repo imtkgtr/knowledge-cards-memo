@@ -48,14 +48,10 @@ type CanvasEditorPageClientProps = {
 const colorChoices = ["#eed9b6", "#cfe5e7", "#f4d8d8", "#dceac8", "#efe0ff"];
 const thumbnailAutoSyncIntervalMs = 60 * 1000;
 const panelSizeLimits = {
-  detailMax: 440,
-  detailMin: 220,
-  paletteMax: 300,
+  detailMax: 360,
+  detailMin: 180,
+  paletteMax: 260,
   paletteMin: 120,
-} as const;
-const editorPreferenceKeys = {
-  detailWidth: "knowledge-canvas:editor:detail-width",
-  paletteWidth: "knowledge-canvas:editor:palette-width",
 } as const;
 const nodeTypes: NodeTypes = {
   knowledgeCard: CardNode,
@@ -269,8 +265,8 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<string, string>>({});
   const [isBodyExpanded, setIsBodyExpanded] = useState(false);
-  const [paletteWidth, setPaletteWidth] = useState(180);
-  const [detailWidth, setDetailWidth] = useState(320);
+  const [paletteWidth, setPaletteWidth] = useState(160);
+  const [detailWidth, setDetailWidth] = useState(260);
   const [pendingLinkSourceId, setPendingLinkSourceId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isAttachmentPending, setIsAttachmentPending] = useState(false);
@@ -468,48 +464,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     setBodyDraft(selectedCard?.body ?? "");
     setTagInputDraft("");
   }, [selectedCard?.body, selectedCard?.title]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const storedPaletteWidth = Number.parseInt(
-      window.localStorage.getItem(editorPreferenceKeys.paletteWidth) ?? "",
-      10,
-    );
-    const storedDetailWidth = Number.parseInt(
-      window.localStorage.getItem(editorPreferenceKeys.detailWidth) ?? "",
-      10,
-    );
-    if (Number.isFinite(storedPaletteWidth)) {
-      setPaletteWidth(
-        Math.min(
-          panelSizeLimits.paletteMax,
-          Math.max(panelSizeLimits.paletteMin, storedPaletteWidth),
-        ),
-      );
-    }
-    if (Number.isFinite(storedDetailWidth)) {
-      setDetailWidth(
-        Math.min(panelSizeLimits.detailMax, Math.max(panelSizeLimits.detailMin, storedDetailWidth)),
-      );
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    window.localStorage.setItem(editorPreferenceKeys.paletteWidth, String(paletteWidth));
-  }, [paletteWidth]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    window.localStorage.setItem(editorPreferenceKeys.detailWidth, String(detailWidth));
-  }, [detailWidth]);
 
   useEffect(() => {
     if (activeFilterTag && !availableTags.includes(activeFilterTag)) {
