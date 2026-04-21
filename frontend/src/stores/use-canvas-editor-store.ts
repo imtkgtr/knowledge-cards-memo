@@ -1,6 +1,6 @@
 "use client";
 
-import type { Attachment, CanvasDocument, Card, HierarchyLink } from "@/lib/api/types";
+import type { Attachment, CanvasDocument, Card, HierarchyLink, RelatedLink } from "@/lib/api/types";
 import { type Patch, applyPatches, enablePatches, produce, produceWithPatches } from "immer";
 import { create } from "zustand";
 
@@ -33,6 +33,13 @@ type CanvasEditorState = {
   appendAttachment: (attachment: Attachment) => void;
   applyCardLayout: (positions: Record<string, { x: number; y: number }>) => boolean;
   bulkDeleteCards: (cardIds: string[]) => void;
+  duplicateCards: (
+    cardIds: string[],
+    options?: {
+      offsetX?: number;
+      offsetY?: number;
+    },
+  ) => string[];
   bulkSetColor: (cardIds: string[], color: string) => void;
   bulkToggleLock: (cardIds: string[], isLocked: boolean) => void;
   createCard: (input: { body?: string; title: string; x: number; y: number }) => string | null;
@@ -79,6 +86,17 @@ function recalculateChildCount(cards: Card[], links: HierarchyLink[]) {
   for (const card of cards) {
     card.childCount = childCountByCard.get(card.id) ?? 0;
   }
+}
+
+function buildDuplicateTitle(title: string) {
+  if (!title.trim()) {
+    return "無題のコピー";
+  }
+  return title.endsWith("のコピー") ? `${title} 2` : `${title}のコピー`;
+}
+
+function filterRelatedLinksByCardIds(links: RelatedLink[], cardIds: Set<string>) {
+  return links.filter((link) => cardIds.has(link.cardAId) && cardIds.has(link.cardBId));
 }
 
 function createsHierarchyCycle(links: HierarchyLink[], parentCardId: string, childCardId: string) {
@@ -299,6 +317,74 @@ export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
           draft.selectedCardIds = [];
         },
       );
+    },
+    duplicateCards: (cardIds, options) => {
+      const duplicatedCardIds: string[] = [];
+      const offsetX = options?.offsetX ?? 48;
+      const offsetY = options?.offsetY ?? 48;
+
+      const didDuplicate = updateDocument(
+        "カード複製",
+        (draft) => {
+          const selectedSet = new Set(cardIds);
+          const sourceCards = draft.cards.filter((card) => selectedSet.has(card.id));
+          if (sourceCards.length === 0) {
+            return;
+          }
+
+          const idMap = new Map<string, string>();
+          const now = getNow();
+          for (const sourceCard of sourceCards) {
+            const duplicatedId = randomUuid();
+            idMap.set(sourceCard.id, duplicatedId);
+            duplicatedCardIds.push(duplicatedId);
+            draft.cards.push({
+              ...sourceCard,
+              id: duplicatedId,
+              title: buildDuplicateTitle(sourceCard.title),
+              x: sourceCard.x + offsetX,
+              y: sourceCard.y + offsetY,
+              childCount: 0,
+              createdAt: now,
+              updatedAt: now,
+            });
+          }
+
+          for (const link of draft.hierarchyLinks.filter(
+            (item) => selectedSet.has(item.parentCardId) && selectedSet.has(item.childCardId),
+          )) {
+            draft.hierarchyLinks.push({
+              ...link,
+              id: randomUuid(),
+              parentCardId: idMap.get(link.parentCardId) ?? link.parentCardId,
+              childCardId: idMap.get(link.childCardId) ?? link.childCardId,
+              createdAt: now,
+            });
+          }
+
+          for (const link of filterRelatedLinksByCardIds(draft.relatedLinks, selectedSet)) {
+            const cardAId = idMap.get(link.cardAId) ?? link.cardAId;
+            const cardBId = idMap.get(link.cardBId) ?? link.cardBId;
+            const [left, right] = sortedPair(cardAId, cardBId);
+            draft.relatedLinks.push({
+              ...link,
+              id: randomUuid(),
+              cardAId: left,
+              cardBId: right,
+              createdAt: now,
+            });
+          }
+
+          recalculateChildCount(draft.cards, draft.hierarchyLinks);
+        },
+        (draft) => {
+          draft.activeMode = "idle";
+          draft.selectedCardId = duplicatedCardIds.length === 1 ? duplicatedCardIds[0] : null;
+          draft.selectedCardIds = [...duplicatedCardIds];
+        },
+      );
+
+      return didDuplicate ? duplicatedCardIds : [];
     },
     bulkSetColor: (cardIds, color) => {
       updateDocument("カード一括色変更", (draft) => {

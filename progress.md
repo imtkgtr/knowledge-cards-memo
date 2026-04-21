@@ -405,3 +405,17 @@
   実ブラウザで本文編集中に選択が維持されるかの最終確認は必要。React Flow 側の内部 selection event と干渉する経路が残る場合は、次に selection change の受け方も見直す必要がある。
 - 次のアクション:
   lint / build を確認したうえで、この選択維持の修正をコミットして push する。
+
+## 2026-04-21 04:18
+- 変更内容:
+  `Ctrl/Cmd + C` と `Ctrl/Cmd + V` で、選択中カードを複製できるようにした。複製時はカード名を `○○のコピー` へ変更し、選択内に含まれる階層リンク・通常リンクも一緒に複製する。貼り付け後は新しいカード群を選択状態にし、少しずらした位置へ配置する。
+- 目的:
+  意見書にあったコピー＆ペースト需要を満たし、複数カードの再利用を速くするため。
+- 影響範囲:
+  `frontend/`、`docs/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/stores/use-canvas-editor-store.ts`、`frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`docs/specs/knowledge_canvas_editor_interaction_spec_v1.0.md`、`progress.md`
+- 未解決事項:
+  OS クリップボードとの連携はしていないため、現在はアプリ内コピーのみ。添付ファイルまでは複製していない。
+- 次のアクション:
+  lint / build を確認したうえで、このカード複製ショートカットをコミットして push する。

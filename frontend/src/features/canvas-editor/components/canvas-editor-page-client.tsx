@@ -261,6 +261,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const bodyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
+  const copiedCardIdsRef = useRef<string[]>([]);
   const lastThumbnailSyncedAtRef = useRef(0);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<
     KnowledgeCardNode,
@@ -295,6 +296,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const bulkSetColor = useCanvasEditorStore((state) => state.bulkSetColor);
   const bulkToggleLock = useCanvasEditorStore((state) => state.bulkToggleLock);
   const bulkDeleteCards = useCanvasEditorStore((state) => state.bulkDeleteCards);
+  const duplicateCards = useCanvasEditorStore((state) => state.duplicateCards);
   const setCanvasName = useCanvasEditorStore((state) => state.setCanvasName);
   const setNextCardColor = useCanvasEditorStore((state) => state.setNextCardColor);
   const setActiveMode = useCanvasEditorStore((state) => state.setActiveMode);
@@ -641,6 +643,26 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         return;
       }
 
+      if (modifierPressed && event.key.toLowerCase() === "c" && selectedCardIds.length > 0) {
+        event.preventDefault();
+        copiedCardIdsRef.current = [...selectedCardIds];
+        setInteractionMessage(`${selectedCardIds.length} 件のカードをコピーしました。`);
+        return;
+      }
+
+      if (
+        modifierPressed &&
+        event.key.toLowerCase() === "v" &&
+        copiedCardIdsRef.current.length > 0
+      ) {
+        event.preventDefault();
+        const duplicatedIds = duplicateCards(copiedCardIdsRef.current);
+        if (duplicatedIds.length > 0) {
+          setInteractionMessage(`${duplicatedIds.length} 件のカードを貼り付けました。`);
+        }
+        return;
+      }
+
       if (event.key === "Escape") {
         setActiveMode("idle");
         setInteractionMessage(null);
@@ -665,7 +687,15 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
 
     window.addEventListener("keydown", handleKeydown);
     return () => window.removeEventListener("keydown", handleKeydown);
-  }, [bulkDeleteCards, document?.cards, redo, selectedCardIds, setActiveMode, undo]);
+  }, [
+    bulkDeleteCards,
+    document?.cards,
+    duplicateCards,
+    redo,
+    selectedCardIds,
+    setActiveMode,
+    undo,
+  ]);
 
   useEffect(() => {
     if (!document || !isDirty || saveState === "saving") {

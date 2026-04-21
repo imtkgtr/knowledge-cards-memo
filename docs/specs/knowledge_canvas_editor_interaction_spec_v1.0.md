@@ -174,6 +174,8 @@
 ## 16. ショートカット
 - `Ctrl + Z`: undo
 - `Ctrl + Y`: redo
+- `Ctrl + C`: 選択カードをコピー
+- `Ctrl + V`: コピーしたカードを貼り付け
 - `Delete` または `Backspace`: 選択削除
 - `Escape`: モード解除 / モーダル閉じる
 
