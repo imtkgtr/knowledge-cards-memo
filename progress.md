@@ -251,3 +251,17 @@
   ブラウザ側で読み込まれている bundle が古い場合は、hard reload か dev server 再起動が必要な可能性がある。hydrate mismatch については再読込後のブラウザ確認がまだ必要。
 - 次のアクション:
   この再発防止をコミットして push し、ブラウザで `/canvases` を強制再読み込みして 404 が消えることを確認する。
+
+## 2026-04-21 01:07
+- 変更内容:
+  `dagre` を導入し、編集画面 top bar に `整列` ボタンを追加した。階層リンクを基準に全体レイアウトを計算し、ロックされていないカードだけを 1 履歴で再配置する。ロックカードがある場合は先頭のロックカードをアンカーにして全体のオフセットを合わせるようにした。
+- 目的:
+  仕様で定義された MVP の全体整列機能を先に成立させ、カード数が増えたキャンバスでも構造を見直しやすくするため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/package.json`、`frontend/bun.lock`、`frontend/src/features/canvas-editor/lib/apply-dagre-layout.ts`、`frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/stores/use-canvas-editor-store.ts`、`progress.md`
+- 未解決事項:
+  添付、サムネイルは未実装。整列には専用テストがまだなく、今回は `bun run lint` と `bun run build` による確認に留めている。複数ロックカードがある場合は先頭アンカー基準のため、厳密な最適配置ではない。
+- 次のアクション:
+  この整列機能をコミットして push し、その後は添付 upload / access URL の実装へ進む。

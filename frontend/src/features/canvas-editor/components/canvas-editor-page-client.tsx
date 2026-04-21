@@ -19,6 +19,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { useCanvasEditorStore } from "@/stores/use-canvas-editor-store";
 import Link from "next/link";
 import { useEffect, useEffectEvent, useMemo, useState, useTransition } from "react";
+import { buildDagreLayout } from "../lib/apply-dagre-layout";
 import { CardNode, type KnowledgeCardNode } from "./card-node";
 import { CreateCardModal } from "./create-card-modal";
 
@@ -87,6 +88,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const moveCard = useCanvasEditorStore((state) => state.moveCard);
   const addHierarchyLink = useCanvasEditorStore((state) => state.addHierarchyLink);
   const addRelatedLink = useCanvasEditorStore((state) => state.addRelatedLink);
+  const applyCardLayout = useCanvasEditorStore((state) => state.applyCardLayout);
   const removeHierarchyLink = useCanvasEditorStore((state) => state.removeHierarchyLink);
   const removeRelatedLink = useCanvasEditorStore((state) => state.removeRelatedLink);
   const toggleCardLock = useCanvasEditorStore((state) => state.toggleCardLock);
@@ -512,6 +514,20 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     setInteractionMessage(`「${card.title}」の位置へ移動しました。`);
   }
 
+  function handleAutoLayout() {
+    if (!document || document.cards.length === 0) {
+      return;
+    }
+
+    const positions = buildDagreLayout(document);
+    const changed = applyCardLayout(positions);
+    setInteractionMessage(
+      changed
+        ? "カードを自動整列しました。ロック中のカードは固定しています。"
+        : "整列対象のカード位置に変更はありませんでした。",
+    );
+  }
+
   return (
     <main className="editor-shell">
       <header className="editor-topbar">
@@ -567,6 +583,9 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           </button>
           <button className="button button--ghost" disabled={!canRedo} onClick={redo} type="button">
             Redo
+          </button>
+          <button className="button button--ghost" onClick={handleAutoLayout} type="button">
+            整列
           </button>
           <button
             className="button button--accent"

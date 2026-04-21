@@ -30,6 +30,7 @@ type CanvasEditorState = {
   selectedCardIds: string[];
   addHierarchyLink: (parentCardId: string, childCardId: string) => boolean;
   addRelatedLink: (cardAId: string, cardBId: string) => boolean;
+  applyCardLayout: (positions: Record<string, { x: number; y: number }>) => boolean;
   bulkDeleteCards: (cardIds: string[]) => void;
   bulkSetColor: (cardIds: string[], color: string) => void;
   bulkToggleLock: (cardIds: string[], isLocked: boolean) => void;
@@ -245,6 +246,28 @@ export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
           draft.activeMode = "idle";
         },
       ),
+    applyCardLayout: (positions) =>
+      updateDocument("カード整列", (draft) => {
+        let didChange = false;
+        for (const card of draft.cards) {
+          if (card.isLocked) {
+            continue;
+          }
+          const nextPosition = positions[card.id];
+          if (!nextPosition) {
+            continue;
+          }
+          if (card.x === nextPosition.x && card.y === nextPosition.y) {
+            continue;
+          }
+          card.x = nextPosition.x;
+          card.y = nextPosition.y;
+          didChange = true;
+        }
+        if (!didChange) {
+          return;
+        }
+      }),
     bulkDeleteCards: (cardIds) => {
       updateDocument(
         "カード一括削除",
