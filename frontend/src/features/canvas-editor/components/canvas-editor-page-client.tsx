@@ -45,12 +45,15 @@ type CanvasEditorPageClientProps = {
   initialDocument: CanvasDocument;
 };
 
-type BodyViewMode = "edit" | "preview" | "split";
-
 const colorChoices = ["#eed9b6", "#cfe5e7", "#f4d8d8", "#dceac8", "#efe0ff"];
 const thumbnailAutoSyncIntervalMs = 60 * 1000;
+const panelSizeLimits = {
+  detailMax: 440,
+  detailMin: 220,
+  paletteMax: 300,
+  paletteMin: 120,
+} as const;
 const editorPreferenceKeys = {
-  bodyViewMode: "knowledge-canvas:editor:body-view-mode",
   detailWidth: "knowledge-canvas:editor:detail-width",
   paletteWidth: "knowledge-canvas:editor:palette-width",
 } as const;
@@ -265,10 +268,9 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [searchQuery, setSearchQuery] = useState("");
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<string, string>>({});
-  const [bodyViewMode, setBodyViewMode] = useState<BodyViewMode>("split");
   const [isBodyExpanded, setIsBodyExpanded] = useState(false);
-  const [paletteWidth, setPaletteWidth] = useState(220);
-  const [detailWidth, setDetailWidth] = useState(360);
+  const [paletteWidth, setPaletteWidth] = useState(180);
+  const [detailWidth, setDetailWidth] = useState(320);
   const [pendingLinkSourceId, setPendingLinkSourceId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isAttachmentPending, setIsAttachmentPending] = useState(false);
@@ -480,22 +482,18 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       window.localStorage.getItem(editorPreferenceKeys.detailWidth) ?? "",
       10,
     );
-    const storedBodyViewMode = window.localStorage.getItem(
-      editorPreferenceKeys.bodyViewMode,
-    ) as BodyViewMode | null;
-
     if (Number.isFinite(storedPaletteWidth)) {
-      setPaletteWidth(Math.min(320, Math.max(180, storedPaletteWidth)));
+      setPaletteWidth(
+        Math.min(
+          panelSizeLimits.paletteMax,
+          Math.max(panelSizeLimits.paletteMin, storedPaletteWidth),
+        ),
+      );
     }
     if (Number.isFinite(storedDetailWidth)) {
-      setDetailWidth(Math.min(520, Math.max(280, storedDetailWidth)));
-    }
-    if (
-      storedBodyViewMode === "edit" ||
-      storedBodyViewMode === "split" ||
-      storedBodyViewMode === "preview"
-    ) {
-      setBodyViewMode(storedBodyViewMode);
+      setDetailWidth(
+        Math.min(panelSizeLimits.detailMax, Math.max(panelSizeLimits.detailMin, storedDetailWidth)),
+      );
     }
   }, []);
 
@@ -512,13 +510,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     }
     window.localStorage.setItem(editorPreferenceKeys.detailWidth, String(detailWidth));
   }, [detailWidth]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    window.localStorage.setItem(editorPreferenceKeys.bodyViewMode, bodyViewMode);
-  }, [bodyViewMode]);
 
   useEffect(() => {
     if (activeFilterTag && !availableTags.includes(activeFilterTag)) {
@@ -549,20 +540,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     setSelectedCardIds,
     visibleCardIds,
   ]);
-
-  useEffect(() => {
-    if (!selectedCardId || !reactFlowInstance) {
-      return;
-    }
-    const card = document?.cards.find((item) => item.id === selectedCardId);
-    if (!card) {
-      return;
-    }
-    reactFlowInstance.setCenter(card.x + 120, card.y + 80, {
-      duration: 250,
-      zoom: Math.max(reactFlowInstance.getZoom(), 0.95),
-    });
-  }, [document?.cards, reactFlowInstance, selectedCardId]);
 
   const commitCanvasName = useEffectEvent((value: string) => {
     const currentName = document?.canvas.name ?? "";
@@ -899,39 +876,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     });
   }
 
-  function handleApplyMarkdownBlock(snippet: string) {
-    if (selectedCard?.isLocked) {
-      return;
-    }
-    const textarea = bodyTextareaRef.current;
-    if (!textarea) {
-      setBodyDraft(
-        (current) => `${current}${current.endsWith("\n") || !current ? "" : "\n"}${snippet}`,
-      );
-      return;
-    }
-
-    const selectionStart = textarea.selectionStart;
-    const selectionEnd = textarea.selectionEnd;
-    const selectedText = bodyDraft.slice(selectionStart, selectionEnd);
-    const prefix =
-      selectionStart > 0 && !bodyDraft.slice(0, selectionStart).endsWith("\n") ? "\n" : "";
-    const suffix =
-      selectionEnd < bodyDraft.length && !bodyDraft.slice(selectionEnd).startsWith("\n")
-        ? "\n"
-        : "";
-    const nextSnippet = snippet.includes("{選択}")
-      ? snippet.replace("{選択}", selectedText || "内容")
-      : snippet;
-    const nextBody =
-      bodyDraft.slice(0, selectionStart) +
-      prefix +
-      nextSnippet +
-      suffix +
-      bodyDraft.slice(selectionEnd);
-    setBodyDraft(nextBody);
-  }
-
   function handleAddTag(rawValue: string) {
     if (!selectedCard || selectedCard.isLocked) {
       return;
@@ -1113,10 +1057,20 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     function handlePointerMove(event: PointerEvent) {
       const deltaX = event.clientX - startX;
       if (target === "palette") {
-        setPaletteWidth(Math.min(320, Math.max(180, startWidth + deltaX)));
+        setPaletteWidth(
+          Math.min(
+            panelSizeLimits.paletteMax,
+            Math.max(panelSizeLimits.paletteMin, startWidth + deltaX),
+          ),
+        );
         return;
       }
-      setDetailWidth(Math.min(520, Math.max(280, startWidth - deltaX)));
+      setDetailWidth(
+        Math.min(
+          panelSizeLimits.detailMax,
+          Math.max(panelSizeLimits.detailMin, startWidth - deltaX),
+        ),
+      );
     }
 
     function handlePointerUp() {
@@ -1130,10 +1084,14 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
 
   function nudgePanelWidth(target: "palette" | "detail", delta: number) {
     if (target === "palette") {
-      setPaletteWidth((current) => Math.min(320, Math.max(180, current + delta)));
+      setPaletteWidth((current) =>
+        Math.min(panelSizeLimits.paletteMax, Math.max(panelSizeLimits.paletteMin, current + delta)),
+      );
       return;
     }
-    setDetailWidth((current) => Math.min(520, Math.max(280, current + delta)));
+    setDetailWidth((current) =>
+      Math.min(panelSizeLimits.detailMax, Math.max(panelSizeLimits.detailMin, current + delta)),
+    );
   }
 
   async function getAccessToken() {
@@ -1228,38 +1186,12 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       >
         <div className="detail-markdown__header">
           <div>
-            <h3>本文ページ</h3>
+            <h3>本文</h3>
             <p className="muted">
-              Markdown
-              で構造化して書けます。見出し、箇条書き、チェックボックス、引用、コードブロックに対応します。
+              プレーンテキストでそのまま書けます。必要なら Markdown 記法も文字として残せます。
             </p>
           </div>
-          <div className="detail-markdown__modeButtons">
-            <button
-              className={bodyViewMode === "edit" ? "button button--accent" : "button button--ghost"}
-              onClick={() => setBodyViewMode("edit")}
-              type="button"
-            >
-              編集
-            </button>
-            <button
-              className={
-                bodyViewMode === "split" ? "button button--accent" : "button button--ghost"
-              }
-              onClick={() => setBodyViewMode("split")}
-              type="button"
-            >
-              分割
-            </button>
-            <button
-              className={
-                bodyViewMode === "preview" ? "button button--accent" : "button button--ghost"
-              }
-              onClick={() => setBodyViewMode("preview")}
-              type="button"
-            >
-              プレビュー
-            </button>
+          <div className="detail-markdown__actions">
             <button
               className="button button--ghost"
               onClick={() => setIsBodyExpanded((current) => !current)}
@@ -1269,87 +1201,23 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             </button>
           </div>
         </div>
-        <div className="detail-markdown__toolbar">
-          <button
-            className="button button--ghost"
-            onClick={() => handleApplyMarkdownBlock("# {選択}")}
-            type="button"
-          >
-            H1
-          </button>
-          <button
-            className="button button--ghost"
-            onClick={() => handleApplyMarkdownBlock("## {選択}")}
-            type="button"
-          >
-            H2
-          </button>
-          <button
-            className="button button--ghost"
-            onClick={() => handleApplyMarkdownBlock("- {選択}")}
-            type="button"
-          >
-            箇条書き
-          </button>
-          <button
-            className="button button--ghost"
-            onClick={() => handleApplyMarkdownBlock("- [ ] {選択}")}
-            type="button"
-          >
-            TODO
-          </button>
-          <button
-            className="button button--ghost"
-            onClick={() => handleApplyMarkdownBlock("> {選択}")}
-            type="button"
-          >
-            引用
-          </button>
-          <button
-            className="button button--ghost"
-            onClick={() => handleApplyMarkdownBlock("```\n{選択}\n```")}
-            type="button"
-          >
-            code
-          </button>
-        </div>
-        <div
-          className={
-            bodyViewMode === "split"
-              ? "detail-markdown__workspace detail-markdown__workspace--split"
-              : "detail-markdown__workspace"
-          }
-        >
-          {bodyViewMode !== "preview" ? (
-            <label className="field">
-              <span>{expanded ? "Markdown ページ編集" : "Markdown 編集"}</span>
-              <textarea
-                className={expanded ? "textarea textarea--page" : "textarea textarea--markdown"}
-                disabled={!canEditBody}
-                onBlur={(event) => commitCardBody(event.target.value)}
-                onChange={(event) => setBodyDraft(event.target.value)}
-                placeholder={
-                  expanded
-                    ? "# 見出し\n\n- 要点\n- TODO\n\n> 気づき\n\n```text\nメモ\n```"
-                    : "Markdown で本文を書けます"
-                }
-                ref={bodyTextareaRef}
-                value={bodyDraft}
-              />
-            </label>
-          ) : null}
-          {bodyViewMode !== "edit" ? (
-            <div className="detail-markdown__preview">
-              <span>プレビュー</span>
-              <div
-                className={
-                  expanded ? "markdown-surface markdown-surface--page" : "markdown-surface"
-                }
-              >
-                {renderMarkdownDocument(bodyDraft)}
-              </div>
-            </div>
-          ) : null}
+        <div className="detail-markdown__workspace">
+          <label className="field">
+            <span>{expanded ? "本文ページ編集" : "本文編集"}</span>
+            <textarea
+              className={expanded ? "textarea textarea--page" : "textarea"}
+              disabled={!canEditBody}
+              onBlur={(event) => commitCardBody(event.target.value)}
+              onChange={(event) => setBodyDraft(event.target.value)}
+              placeholder={
+                expanded
+                  ? "ここに本文を書いてください。必要なら Markdown 記法もそのまま使えます。"
+                  : "ここに本文を書いてください"
+              }
+              ref={bodyTextareaRef}
+              value={bodyDraft}
+            />
+          </label>
         </div>
       </section>
     );
@@ -1478,7 +1346,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       <section
         className="editor-layout"
         style={{
-          gridTemplateColumns: `${paletteWidth}px 10px minmax(0, 1fr) 10px ${detailWidth}px`,
+          gridTemplateColumns: `${paletteWidth}px minmax(0, 1fr) ${detailWidth}px`,
         }}
       >
         <aside className="editor-palette">
@@ -1586,25 +1454,24 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               ))}
             </div>
           </div>
+          <div
+            aria-label="左パネルの幅を変更"
+            className="editor-resizer editor-resizer--palette"
+            onKeyDown={(event) => {
+              if (event.key === "ArrowLeft") {
+                event.preventDefault();
+                nudgePanelWidth("palette", -16);
+              }
+              if (event.key === "ArrowRight") {
+                event.preventDefault();
+                nudgePanelWidth("palette", 16);
+              }
+            }}
+            onPointerDown={(event) => startPanelResize("palette", event.clientX)}
+            role="separator"
+            tabIndex={0}
+          />
         </aside>
-
-        <div
-          aria-label="左パネルの幅を変更"
-          className="editor-resizer"
-          onKeyDown={(event) => {
-            if (event.key === "ArrowLeft") {
-              event.preventDefault();
-              nudgePanelWidth("palette", -16);
-            }
-            if (event.key === "ArrowRight") {
-              event.preventDefault();
-              nudgePanelWidth("palette", 16);
-            }
-          }}
-          onPointerDown={(event) => startPanelResize("palette", event.clientX)}
-          role="separator"
-          tabIndex={0}
-        />
 
         <div className="editor-canvas" ref={canvasContainerRef}>
           <ReactFlow<KnowledgeCardNode, Edge>
@@ -1641,24 +1508,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             <MiniMap />
           </ReactFlow>
         </div>
-
-        <div
-          aria-label="右パネルの幅を変更"
-          className="editor-resizer"
-          onKeyDown={(event) => {
-            if (event.key === "ArrowLeft") {
-              event.preventDefault();
-              nudgePanelWidth("detail", 16);
-            }
-            if (event.key === "ArrowRight") {
-              event.preventDefault();
-              nudgePanelWidth("detail", -16);
-            }
-          }}
-          onPointerDown={(event) => startPanelResize("detail", event.clientX)}
-          role="separator"
-          tabIndex={0}
-        />
 
         <aside className="editor-detail">
           {selectedCard ? (
@@ -1894,6 +1743,23 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               <p className="muted">右パネルではタイトル、本文、タグ、色、リンクを編集できます。</p>
             </div>
           )}
+          <div
+            aria-label="右パネルの幅を変更"
+            className="editor-resizer editor-resizer--detail"
+            onKeyDown={(event) => {
+              if (event.key === "ArrowLeft") {
+                event.preventDefault();
+                nudgePanelWidth("detail", 16);
+              }
+              if (event.key === "ArrowRight") {
+                event.preventDefault();
+                nudgePanelWidth("detail", -16);
+              }
+            }}
+            onPointerDown={(event) => startPanelResize("detail", event.clientX)}
+            role="separator"
+            tabIndex={0}
+          />
         </aside>
       </section>
 
