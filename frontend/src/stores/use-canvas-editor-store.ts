@@ -135,6 +135,13 @@ function pushHistory(history: HistoryEntry[], historyIndex: number, entry: Histo
   };
 }
 
+function areCardIdsEqual(left: string[], right: string[]) {
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((cardId, index) => cardId === right[index]);
+}
+
 export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
   function updateDocument(
     label: string,
@@ -433,11 +440,20 @@ export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
         }),
       );
     },
-    selectCard: (selectedCardId) =>
+    selectCard: (selectedCardId) => {
+      const state = get();
+      const nextSelectedCardIds = selectedCardId ? [selectedCardId] : [];
+      if (
+        state.selectedCardId === selectedCardId &&
+        areCardIdsEqual(state.selectedCardIds, nextSelectedCardIds)
+      ) {
+        return;
+      }
       set({
         selectedCardId,
-        selectedCardIds: selectedCardId ? [selectedCardId] : [],
-      }),
+        selectedCardIds: nextSelectedCardIds,
+      });
+    },
     setActiveMode: (activeMode) => set({ activeMode }),
     setCanvasName: (name) => {
       updateDocument("キャンバス名変更", (draft) => {
@@ -451,11 +467,20 @@ export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
     },
     setNextCardColor: (nextCardColor) => set({ nextCardColor }),
     setSaveState: (saveState, saveError = null) => set({ saveError, saveState }),
-    setSelectedCardIds: (selectedCardIds) =>
+    setSelectedCardIds: (selectedCardIds) => {
+      const state = get();
+      const nextSelectedCardId = selectedCardIds.length === 1 ? selectedCardIds[0] : null;
+      if (
+        state.selectedCardId === nextSelectedCardId &&
+        areCardIdsEqual(state.selectedCardIds, selectedCardIds)
+      ) {
+        return;
+      }
       set({
-        selectedCardId: selectedCardIds.length === 1 ? selectedCardIds[0] : null,
+        selectedCardId: nextSelectedCardId,
         selectedCardIds,
-      }),
+      });
+    },
     toggleCardLock: (cardId) => {
       updateDocument("カードロック切替", (draft) => {
         const card = draft.cards.find((item) => item.id === cardId);

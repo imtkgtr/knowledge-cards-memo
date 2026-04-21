@@ -307,3 +307,17 @@
   実ブラウザでの最終確認は必要。小画面では sticky を無効化しているため、モバイル相当幅での導線改善余地はまだある。
 - 次のアクション:
   この視認性改善をコミットして push し、ブラウザで top bar に `カード追加` が見えていることを確認する。
+
+## 2026-04-21 02:15
+- 変更内容:
+  editor store の `selectCard` / `setSelectedCardIds` に同値更新ガードを追加し、同じ選択状態を繰り返し `set` しないようにした。
+- 目的:
+  タグ絞り込みと React Flow の selection change が重なった際に、同じ選択状態の更新が連鎖して `Maximum update depth exceeded` になるのを防ぐため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/stores/use-canvas-editor-store.ts`、`progress.md`
+- 未解決事項:
+  実ブラウザで canvas 作成後に編集画面へ入り、エラーが消えているかの最終確認は必要。
+- 次のアクション:
+  このループ防止修正をコミットして push し、ブラウザで canvas 詳細画面へ入れることを再確認する。
