@@ -335,6 +335,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         type: "knowledgeCard",
         position: { x: card.x, y: card.y },
         draggable: !card.isLocked,
+        selected: selectedCardIds.includes(card.id),
         selectable: true,
         data: {
           title: card.title,
@@ -346,7 +347,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           tagSummary: card.tagNames.slice(0, 2).join(", "),
         },
       })),
-    [activeHighlightTag, visibleCards],
+    [activeHighlightTag, selectedCardIds, visibleCards],
   );
 
   const edgesFromDocument = useMemo<Edge[]>(

@@ -391,3 +391,17 @@
   Markdown プレビューは軽量実装のため、表やネストした記法までは未対応。本文の full-page 編集時により Notion らしいブロック操作を入れる余地がある。
 - 次のアクション:
   lint / build を確認したうえで、この本文・タグ入力改善をコミットして push する。
+
+## 2026-04-21 04:10
+- 変更内容:
+  card node の再生成時にも `selected` 状態を明示するようにし、本文編集中や自動保存前後で React Flow の選択が空へ戻りにくいようにした。
+- 目的:
+  実使用で出ていた「自動保存でカードの選択がリセットされる」違和感を先に軽減し、連続編集しやすくするため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`progress.md`
+- 未解決事項:
+  実ブラウザで本文編集中に選択が維持されるかの最終確認は必要。React Flow 側の内部 selection event と干渉する経路が残る場合は、次に selection change の受け方も見直す必要がある。
+- 次のアクション:
+  lint / build を確認したうえで、この選択維持の修正をコミットして push する。
