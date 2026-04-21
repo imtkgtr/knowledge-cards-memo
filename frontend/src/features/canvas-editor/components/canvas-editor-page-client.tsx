@@ -706,6 +706,13 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           <button className="button button--ghost" disabled={!canRedo} onClick={redo} type="button">
             Redo
           </button>
+          <button
+            className="button button--accent"
+            onClick={() => setIsCreateModalOpen(true)}
+            type="button"
+          >
+            カード追加
+          </button>
           <button className="button button--ghost" onClick={handleAutoLayout} type="button">
             整列
           </button>

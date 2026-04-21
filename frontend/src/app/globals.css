@@ -307,6 +307,8 @@ input {
   display: grid;
   align-content: start;
   gap: 16px;
+  position: sticky;
+  top: 20px;
 }
 
 .editor-palette__section {
@@ -595,6 +597,10 @@ input {
 
   .editor-layout {
     grid-template-columns: 1fr;
+  }
+
+  .editor-palette {
+    position: static;
   }
 
   .auth-page,
