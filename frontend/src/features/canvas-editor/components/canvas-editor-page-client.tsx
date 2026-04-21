@@ -66,6 +66,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
+  const [pendingLinkSourceId, setPendingLinkSourceId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isAttachmentPending, setIsAttachmentPending] = useState(false);
   const [tagsDraft, setTagsDraft] = useState("");
@@ -501,8 +502,16 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   }
 
   function toggleMode(mode: "addHierarchyLink" | "addRelatedLink") {
-    setInteractionMessage(null);
-    setActiveMode(activeMode === mode ? "idle" : mode);
+    if (activeMode === mode) {
+      setActiveMode("idle");
+      setPendingLinkSourceId(null);
+      setInteractionMessage(null);
+      return;
+    }
+
+    setActiveMode(mode);
+    setPendingLinkSourceId(null);
+    setInteractionMessage("起点カードをクリックしてください。");
   }
 
   function handleNodeClick(nodeId: string) {
@@ -512,19 +521,27 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       return;
     }
 
-    if (!selectedCardId) {
+    const sourceCardId = pendingLinkSourceId ?? selectedCardId;
+    if (!sourceCardId) {
       selectCard(nodeId);
+      setPendingLinkSourceId(nodeId);
       setInteractionMessage("起点カードを選択してから、対象カードをクリックしてください。");
       return;
     }
 
-    if (selectedCardId === nodeId) {
+    if (sourceCardId === nodeId) {
       setInteractionMessage("同じカード同士は接続できません。");
       return;
     }
 
+    if (!pendingLinkSourceId) {
+      selectCard(sourceCardId);
+      setPendingLinkSourceId(sourceCardId);
+    }
+
     if (activeMode === "addHierarchyLink") {
-      const wasAdded = addHierarchyLink(selectedCardId, nodeId);
+      const wasAdded = addHierarchyLink(sourceCardId, nodeId);
+      setPendingLinkSourceId(null);
       setInteractionMessage(
         wasAdded
           ? "階層リンクを追加しました。"
@@ -533,7 +550,8 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       return;
     }
 
-    const wasAdded = addRelatedLink(selectedCardId, nodeId);
+    const wasAdded = addRelatedLink(sourceCardId, nodeId);
+    setPendingLinkSourceId(null);
     setInteractionMessage(
       wasAdded
         ? "通常リンクを追加しました。"
@@ -790,7 +808,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             className={
               activeMode === "addHierarchyLink" ? "button button--accent" : "button button--ghost"
             }
-            disabled={selectedCardIds.length !== 1}
             onClick={() => toggleMode("addHierarchyLink")}
             type="button"
           >
@@ -800,12 +817,19 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             className={
               activeMode === "addRelatedLink" ? "button button--accent" : "button button--ghost"
             }
-            disabled={selectedCardIds.length !== 1}
             onClick={() => toggleMode("addRelatedLink")}
             type="button"
           >
             通常リンク追加
           </button>
+          {activeMode !== "idle" ? (
+            <p className="muted">
+              起点:{" "}
+              {pendingLinkSourceId
+                ? findCardLabel(document ?? null, pendingLinkSourceId)
+                : "未選択"}
+            </p>
+          ) : null}
           <button
             className="button button--ghost"
             disabled={!selectedCardId}
