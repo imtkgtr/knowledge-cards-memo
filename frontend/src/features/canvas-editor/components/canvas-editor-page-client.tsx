@@ -70,6 +70,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
+  const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<string, string>>({});
   const [pendingLinkSourceId, setPendingLinkSourceId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isAttachmentPending, setIsAttachmentPending] = useState(false);
@@ -391,6 +392,55 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     const timeoutId = window.setTimeout(() => commitCardTags(tagsDraft), 500);
     return () => window.clearTimeout(timeoutId);
   }, [commitCardTags, selectedCard, tagsDraft]);
+
+  useEffect(() => {
+    const imageAttachments = selectedAttachments.filter(
+      (attachment) => attachment.kind === "image",
+    );
+    const missingPreviewAttachments = imageAttachments.filter(
+      (attachment) => !attachmentPreviewUrls[attachment.id],
+    );
+    if (missingPreviewAttachments.length === 0) {
+      return;
+    }
+
+    let isCancelled = false;
+    void (async () => {
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        return;
+      }
+
+      const nextEntries = await Promise.all(
+        missingPreviewAttachments.map(async (attachment) => {
+          try {
+            const url = await clientGetAttachmentAccessUrl(accessToken, attachment.id);
+            return [attachment.id, url] as const;
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      if (isCancelled) {
+        return;
+      }
+
+      setAttachmentPreviewUrls((current) => {
+        const updates = nextEntries.filter((entry): entry is readonly [string, string] =>
+          Boolean(entry),
+        );
+        if (updates.length === 0) {
+          return current;
+        }
+        return Object.fromEntries([...Object.entries(current), ...updates]);
+      });
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [attachmentPreviewUrls, selectedAttachments]);
 
   useEffect(() => {
     function handleKeydown(event: KeyboardEvent) {
@@ -738,6 +788,14 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     try {
       await clientDeleteAttachment(accessToken, attachmentId);
       removeAttachment(attachmentId);
+      setAttachmentPreviewUrls((current) => {
+        if (!current[attachmentId]) {
+          return current;
+        }
+        const next = { ...current };
+        delete next[attachmentId];
+        return next;
+      });
       setInteractionMessage("添付ファイルを削除しました。");
     } catch (error) {
       setInteractionMessage(
@@ -1156,10 +1214,30 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                 {selectedAttachments.length ? (
                   <ul>
                     {selectedAttachments.map((attachment) => (
-                      <li key={attachment.id}>
-                        <span>
-                          [{attachment.kind}] {attachment.fileName}
-                        </span>
+                      <li
+                        className={
+                          attachment.kind === "image"
+                            ? "detail-attachment detail-attachment--image"
+                            : undefined
+                        }
+                        key={attachment.id}
+                      >
+                        <div className="detail-attachment__body">
+                          <span>
+                            [{attachment.kind}] {attachment.fileName}
+                          </span>
+                          {attachment.kind === "image" ? (
+                            attachmentPreviewUrls[attachment.id] ? (
+                              <img
+                                alt={attachment.fileName}
+                                className="detail-attachment__preview"
+                                src={attachmentPreviewUrls[attachment.id]}
+                              />
+                            ) : (
+                              <p className="muted">プレビューを読み込み中です。</p>
+                            )
+                          ) : null}
+                        </div>
                         <div className="detail-links__actions">
                           <button
                             className="button button--ghost"

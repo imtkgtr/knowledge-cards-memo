@@ -416,6 +416,23 @@ input {
   background: rgba(255, 255, 255, 0.72);
 }
 
+.detail-attachment {
+  align-items: flex-start;
+}
+
+.detail-attachment__body {
+  display: grid;
+  gap: 8px;
+}
+
+.detail-attachment__preview {
+  width: min(100%, 220px);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #f7f0df;
+  object-fit: cover;
+}
+
 .textarea {
   min-height: 180px;
   padding: 12px 14px;
