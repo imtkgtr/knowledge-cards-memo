@@ -194,67 +194,55 @@ export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
     selectedCardId: null,
     selectedCardIds: [],
     addHierarchyLink: (parentCardId, childCardId) =>
-      updateDocument(
-        "階層リンク追加",
-        (draft) => {
-          if (parentCardId === childCardId) {
-            return;
-          }
-          const parent = draft.cards.find((card) => card.id === parentCardId);
-          const child = draft.cards.find((card) => card.id === childCardId);
-          if (!parent || !child || parent.isLocked || child.isLocked) {
-            return;
-          }
-          const exists = draft.hierarchyLinks.some(
-            (link) => link.parentCardId === parentCardId && link.childCardId === childCardId,
-          );
-          if (exists || createsHierarchyCycle(draft.hierarchyLinks, parentCardId, childCardId)) {
-            return;
-          }
-          draft.hierarchyLinks.push({
-            id: randomUuid(),
-            canvasId: draft.canvas.id,
-            parentCardId,
-            childCardId,
-            createdAt: getNow(),
-          });
-          recalculateChildCount(draft.cards, draft.hierarchyLinks);
-        },
-        (draft) => {
-          draft.activeMode = "idle";
-        },
-      ),
+      updateDocument("階層リンク追加", (draft) => {
+        if (parentCardId === childCardId) {
+          return;
+        }
+        const parent = draft.cards.find((card) => card.id === parentCardId);
+        const child = draft.cards.find((card) => card.id === childCardId);
+        if (!parent || !child || parent.isLocked || child.isLocked) {
+          return;
+        }
+        const exists = draft.hierarchyLinks.some(
+          (link) => link.parentCardId === parentCardId && link.childCardId === childCardId,
+        );
+        if (exists || createsHierarchyCycle(draft.hierarchyLinks, parentCardId, childCardId)) {
+          return;
+        }
+        draft.hierarchyLinks.push({
+          id: randomUuid(),
+          canvasId: draft.canvas.id,
+          parentCardId,
+          childCardId,
+          createdAt: getNow(),
+        });
+        recalculateChildCount(draft.cards, draft.hierarchyLinks);
+      }),
     addRelatedLink: (cardAId, cardBId) =>
-      updateDocument(
-        "通常リンク追加",
-        (draft) => {
-          if (cardAId === cardBId) {
-            return;
-          }
-          const cardA = draft.cards.find((card) => card.id === cardAId);
-          const cardB = draft.cards.find((card) => card.id === cardBId);
-          if (!cardA || !cardB || cardA.isLocked || cardB.isLocked) {
-            return;
-          }
-          const [left, right] = sortedPair(cardAId, cardBId);
-          const exists = draft.relatedLinks.some(
-            (link) => link.cardAId === left && link.cardBId === right,
-          );
-          if (exists) {
-            return;
-          }
-          draft.relatedLinks.push({
-            id: randomUuid(),
-            canvasId: draft.canvas.id,
-            cardAId: left,
-            cardBId: right,
-            createdAt: getNow(),
-          });
-        },
-        (draft) => {
-          draft.activeMode = "idle";
-        },
-      ),
+      updateDocument("通常リンク追加", (draft) => {
+        if (cardAId === cardBId) {
+          return;
+        }
+        const cardA = draft.cards.find((card) => card.id === cardAId);
+        const cardB = draft.cards.find((card) => card.id === cardBId);
+        if (!cardA || !cardB || cardA.isLocked || cardB.isLocked) {
+          return;
+        }
+        const [left, right] = sortedPair(cardAId, cardBId);
+        const exists = draft.relatedLinks.some(
+          (link) => link.cardAId === left && link.cardBId === right,
+        );
+        if (exists) {
+          return;
+        }
+        draft.relatedLinks.push({
+          id: randomUuid(),
+          canvasId: draft.canvas.id,
+          cardAId: left,
+          cardBId: right,
+          createdAt: getNow(),
+        });
+      }),
     appendAttachment: (attachment) => {
       set(
         produce((draft: CanvasEditorState) => {

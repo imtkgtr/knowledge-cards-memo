@@ -335,3 +335,17 @@
   実ブラウザで階層リンクと通常リンクの両方を追加できるかの最終確認は必要。
 - 次のアクション:
   このリンク追加導線修正をコミットして push し、ブラウザで起点クリック → 対象クリックの 2 段階で接続できることを確認する。
+
+## 2026-04-21 02:44
+- 変更内容:
+  リンク追加後に mode を解除せず、起点カードを維持したまま連続して子カードや関連カードを追加できるようにした。リンク種別を切り替える際も起点を引き継ぐようにし、通常リンクの描画も `smoothstep` に寄せて階層リンクと流れが揃うようにした。あわせて編集挙動仕様書のリンクモード定義を更新した。
+- 目的:
+  1 本ずつ毎回起点を選び直す負荷を減らし、親子リンクと通常リンクを続けて張る操作を自然にするため。
+- 影響範囲:
+  `frontend/`、`docs/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/stores/use-canvas-editor-store.ts`、`docs/specs/knowledge_canvas_editor_interaction_spec_v1.0.md`、`progress.md`
+- 未解決事項:
+  実ブラウザで連続リンク追加、モード切替時の起点引き継ぎ、関連リンクの視認性を最終確認する必要がある。
+- 次のアクション:
+  lint / build を通し、今回の連続リンク操作改善をコミットして push する。

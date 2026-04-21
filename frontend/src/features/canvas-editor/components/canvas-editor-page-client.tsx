@@ -181,7 +181,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           id: link.id,
           source: link.cardAId,
           target: link.cardBId,
-          type: "default",
+          type: "smoothstep",
           style: { strokeDasharray: "6 4", strokeWidth: 2 },
           data: { kind: "related" },
         })) satisfies Edge[]),
@@ -510,8 +510,14 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     }
 
     setActiveMode(mode);
-    setPendingLinkSourceId(null);
-    setInteractionMessage("起点カードをクリックしてください。");
+    const nextSourceId =
+      pendingLinkSourceId ?? (selectedCardIds.length === 1 ? selectedCardId : null);
+    setPendingLinkSourceId(nextSourceId);
+    setInteractionMessage(
+      nextSourceId
+        ? `起点「${findCardLabel(document ?? null, nextSourceId)}」を維持しました。接続先カードをクリックしてください。`
+        : "起点カードをクリックしてください。",
+    );
   }
 
   function handleNodeClick(nodeId: string) {
@@ -530,7 +536,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     }
 
     if (sourceCardId === nodeId) {
-      setInteractionMessage("同じカード同士は接続できません。");
+      setInteractionMessage("起点カードです。接続先カードをクリックしてください。");
       return;
     }
 
@@ -541,20 +547,22 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
 
     if (activeMode === "addHierarchyLink") {
       const wasAdded = addHierarchyLink(sourceCardId, nodeId);
-      setPendingLinkSourceId(null);
+      setPendingLinkSourceId(sourceCardId);
+      selectCard(sourceCardId);
       setInteractionMessage(
         wasAdded
-          ? "階層リンクを追加しました。"
+          ? "階層リンクを追加しました。起点は維持しています。"
           : "階層リンクを追加できませんでした。重複、循環、ロック状態を確認してください。",
       );
       return;
     }
 
     const wasAdded = addRelatedLink(sourceCardId, nodeId);
-    setPendingLinkSourceId(null);
+    setPendingLinkSourceId(sourceCardId);
+    selectCard(sourceCardId);
     setInteractionMessage(
       wasAdded
-        ? "通常リンクを追加しました。"
+        ? "通常リンクを追加しました。起点は維持しています。"
         : "通常リンクを追加できませんでした。重複またはロック状態を確認してください。",
     );
   }
