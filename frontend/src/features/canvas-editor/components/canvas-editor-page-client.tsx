@@ -26,7 +26,16 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { useCanvasEditorStore } from "@/stores/use-canvas-editor-store";
 import { toBlob } from "html-to-image";
 import Link from "next/link";
-import { useEffect, useEffectEvent, useMemo, useRef, useState, useTransition } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { buildDagreLayout } from "../lib/apply-dagre-layout";
 import { CardNode, type KnowledgeCardNode } from "./card-node";
 import { CreateCardModal } from "./create-card-modal";
@@ -34,6 +43,8 @@ import { CreateCardModal } from "./create-card-modal";
 type CanvasEditorPageClientProps = {
   initialDocument: CanvasDocument;
 };
+
+type BodyViewMode = "edit" | "preview" | "split";
 
 const colorChoices = ["#eed9b6", "#cfe5e7", "#f4d8d8", "#dceac8", "#efe0ff"];
 const thumbnailAutoSyncIntervalMs = 60 * 1000;
@@ -53,11 +64,179 @@ function findCardLabel(document: CanvasDocument | null, cardId: string) {
   return document?.cards.find((card) => card.id === cardId)?.title || cardId;
 }
 
-function parseTags(value: string) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+function normalizeTag(value: string) {
+  return value.trim().replace(/\s+/g, "-").toLowerCase();
+}
+
+function normalizeTags(values: string[]) {
+  return Array.from(new Set(values.map(normalizeTag).filter(Boolean)));
+}
+
+function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
+  return text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g).map((part, index) => {
+    const key = `${keyPrefix}-${index}`;
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return <code key={key}>{part.slice(1, -1)}</code>;
+    }
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={key}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith("*") && part.endsWith("*")) {
+      return <em key={key}>{part.slice(1, -1)}</em>;
+    }
+    return <span key={key}>{part}</span>;
+  });
+}
+
+function renderMarkdownDocument(markdown: string) {
+  if (!markdown.trim()) {
+    return <p className="markdown-empty">本文はまだありません。</p>;
+  }
+
+  const lines = markdown.replace(/\r/g, "").split("\n");
+  const blocks: ReactNode[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index];
+
+    if (!line.trim()) {
+      index += 1;
+      continue;
+    }
+
+    if (line.startsWith("```")) {
+      const codeLines: string[] = [];
+      index += 1;
+      while (index < lines.length && !lines[index].startsWith("```")) {
+        codeLines.push(lines[index]);
+        index += 1;
+      }
+      if (index < lines.length) {
+        index += 1;
+      }
+      blocks.push(
+        <pre className="markdown-code" key={`code-${index}`}>
+          <code>{codeLines.join("\n")}</code>
+        </pre>,
+      );
+      continue;
+    }
+
+    const headingMatch = line.match(/^(#{1,3})\s+(.*)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const content = headingMatch[2];
+      const className = level === 1 ? "markdown-h1" : level === 2 ? "markdown-h2" : "markdown-h3";
+      blocks.push(
+        <div className={className} key={`heading-${index}`}>
+          {renderInlineMarkdown(content, `heading-${index}`)}
+        </div>,
+      );
+      index += 1;
+      continue;
+    }
+
+    if (/^>\s?/.test(line)) {
+      const quoteLines: string[] = [];
+      while (index < lines.length && /^>\s?/.test(lines[index])) {
+        quoteLines.push(lines[index].replace(/^>\s?/, ""));
+        index += 1;
+      }
+      blocks.push(
+        <blockquote className="markdown-quote" key={`quote-${index}`}>
+          {quoteLines.map((quoteLine, quoteIndex) => (
+            <p key={`quote-line-${index}-${quoteIndex}-${quoteLine}`}>
+              {renderInlineMarkdown(quoteLine, `quote-${index}-${quoteIndex}`)}
+            </p>
+          ))}
+        </blockquote>,
+      );
+      continue;
+    }
+
+    if (/^[-*]\s+\[[ xX]\]\s+/.test(line)) {
+      const items: { checked: boolean; text: string }[] = [];
+      while (index < lines.length && /^[-*]\s+\[[ xX]\]\s+/.test(lines[index])) {
+        const itemLine = lines[index];
+        items.push({
+          checked: /^[-*]\s+\[[xX]\]\s+/.test(itemLine),
+          text: itemLine.replace(/^[-*]\s+\[[ xX]\]\s+/, ""),
+        });
+        index += 1;
+      }
+      blocks.push(
+        <ul className="markdown-checklist" key={`checklist-${index}`}>
+          {items.map((item, itemIndex) => (
+            <li key={`check-item-${index}-${itemIndex}-${item.text}`}>
+              <input checked={item.checked} readOnly type="checkbox" />
+              <span>{renderInlineMarkdown(item.text, `check-${index}-${itemIndex}`)}</span>
+            </li>
+          ))}
+        </ul>,
+      );
+      continue;
+    }
+
+    if (/^[-*]\s+/.test(line)) {
+      const items: string[] = [];
+      while (index < lines.length && /^[-*]\s+/.test(lines[index])) {
+        items.push(lines[index].replace(/^[-*]\s+/, ""));
+        index += 1;
+      }
+      blocks.push(
+        <ul className="markdown-list" key={`list-${index}`}>
+          {items.map((item, itemIndex) => (
+            <li key={`list-item-${index}-${itemIndex}-${item}`}>
+              {renderInlineMarkdown(item, `list-${index}-${itemIndex}`)}
+            </li>
+          ))}
+        </ul>,
+      );
+      continue;
+    }
+
+    if (/^\d+\.\s+/.test(line)) {
+      const items: string[] = [];
+      while (index < lines.length && /^\d+\.\s+/.test(lines[index])) {
+        items.push(lines[index].replace(/^\d+\.\s+/, ""));
+        index += 1;
+      }
+      blocks.push(
+        <ol className="markdown-list" key={`ordered-${index}`}>
+          {items.map((item, itemIndex) => (
+            <li key={`ordered-item-${index}-${itemIndex}-${item}`}>
+              {renderInlineMarkdown(item, `ordered-${index}-${itemIndex}`)}
+            </li>
+          ))}
+        </ol>,
+      );
+      continue;
+    }
+
+    const paragraphLines: string[] = [];
+    while (
+      index < lines.length &&
+      lines[index].trim() &&
+      !lines[index].startsWith("```") &&
+      !/^(#{1,3})\s+/.test(lines[index]) &&
+      !/^>\s?/.test(lines[index]) &&
+      !/^[-*]\s+\[[ xX]\]\s+/.test(lines[index]) &&
+      !/^[-*]\s+/.test(lines[index]) &&
+      !/^\d+\.\s+/.test(lines[index])
+    ) {
+      paragraphLines.push(lines[index]);
+      index += 1;
+    }
+
+    blocks.push(
+      <p className="markdown-paragraph" key={`paragraph-${index}`}>
+        {renderInlineMarkdown(paragraphLines.join(" "), `paragraph-${index}`)}
+      </p>,
+    );
+  }
+
+  return <div className="markdown-body">{blocks}</div>;
 }
 
 export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClientProps) {
@@ -71,13 +250,16 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [searchQuery, setSearchQuery] = useState("");
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<string, string>>({});
+  const [bodyViewMode, setBodyViewMode] = useState<BodyViewMode>("split");
+  const [isBodyExpanded, setIsBodyExpanded] = useState(false);
   const [pendingLinkSourceId, setPendingLinkSourceId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isAttachmentPending, setIsAttachmentPending] = useState(false);
   const [isThumbnailPending, setIsThumbnailPending] = useState(false);
-  const [tagsDraft, setTagsDraft] = useState("");
+  const [tagInputDraft, setTagInputDraft] = useState("");
   const [titleDraft, setTitleDraft] = useState("");
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const bodyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const lastThumbnailSyncedAtRef = useRef(0);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<
@@ -258,8 +440,8 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   useEffect(() => {
     setTitleDraft(selectedCard?.title ?? "");
     setBodyDraft(selectedCard?.body ?? "");
-    setTagsDraft(selectedCard?.tagNames.join(", ") ?? "");
-  }, [selectedCard?.body, selectedCard?.tagNames, selectedCard?.title]);
+    setTagInputDraft("");
+  }, [selectedCard?.body, selectedCard?.title]);
 
   useEffect(() => {
     if (activeFilterTag && !availableTags.includes(activeFilterTag)) {
@@ -338,11 +520,11 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     updateCard(selectedCard.id, { body: value });
   });
 
-  const commitCardTags = useEffectEvent((value: string) => {
+  const commitCardTags = useEffectEvent((values: string[]) => {
     if (!selectedCard) {
       return;
     }
-    const nextTags = parseTags(value);
+    const nextTags = normalizeTags(values);
     if (nextTags.join(",") === selectedCard.tagNames.join(",")) {
       return;
     }
@@ -381,17 +563,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     const timeoutId = window.setTimeout(() => commitCardBody(bodyDraft), 500);
     return () => window.clearTimeout(timeoutId);
   }, [bodyDraft, commitCardBody, selectedCard]);
-
-  useEffect(() => {
-    if (!selectedCard || selectedCard.isLocked) {
-      return;
-    }
-    if (parseTags(tagsDraft).join(",") === selectedCard.tagNames.join(",")) {
-      return;
-    }
-    const timeoutId = window.setTimeout(() => commitCardTags(tagsDraft), 500);
-    return () => window.clearTimeout(timeoutId);
-  }, [commitCardTags, selectedCard, tagsDraft]);
 
   useEffect(() => {
     const imageAttachments = selectedAttachments.filter(
@@ -623,6 +794,75 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     });
   }
 
+  function handleApplyMarkdownBlock(snippet: string) {
+    if (selectedCard?.isLocked) {
+      return;
+    }
+    const textarea = bodyTextareaRef.current;
+    if (!textarea) {
+      setBodyDraft(
+        (current) => `${current}${current.endsWith("\n") || !current ? "" : "\n"}${snippet}`,
+      );
+      return;
+    }
+
+    const selectionStart = textarea.selectionStart;
+    const selectionEnd = textarea.selectionEnd;
+    const selectedText = bodyDraft.slice(selectionStart, selectionEnd);
+    const prefix =
+      selectionStart > 0 && !bodyDraft.slice(0, selectionStart).endsWith("\n") ? "\n" : "";
+    const suffix =
+      selectionEnd < bodyDraft.length && !bodyDraft.slice(selectionEnd).startsWith("\n")
+        ? "\n"
+        : "";
+    const nextSnippet = snippet.includes("{選択}")
+      ? snippet.replace("{選択}", selectedText || "内容")
+      : snippet;
+    const nextBody =
+      bodyDraft.slice(0, selectionStart) +
+      prefix +
+      nextSnippet +
+      suffix +
+      bodyDraft.slice(selectionEnd);
+    setBodyDraft(nextBody);
+  }
+
+  function handleAddTag(rawValue: string) {
+    if (!selectedCard || selectedCard.isLocked) {
+      return;
+    }
+    const normalized = normalizeTag(rawValue);
+    if (!normalized) {
+      setTagInputDraft("");
+      return;
+    }
+    if (selectedCard.tagNames.includes(normalized)) {
+      setTagInputDraft("");
+      return;
+    }
+    commitCardTags([...selectedCard.tagNames, normalized]);
+    setTagInputDraft("");
+  }
+
+  function handleRemoveTag(tagName: string) {
+    if (!selectedCard || selectedCard.isLocked) {
+      return;
+    }
+    commitCardTags(selectedCard.tagNames.filter((tag) => tag !== tagName));
+  }
+
+  function handleTagInputKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter" || event.key === "," || event.key === "Tab") {
+      event.preventDefault();
+      handleAddTag(tagInputDraft);
+      return;
+    }
+    if (event.key === "Backspace" && !tagInputDraft && selectedCard?.tagNames.length) {
+      event.preventDefault();
+      handleRemoveTag(selectedCard.tagNames[selectedCard.tagNames.length - 1]);
+    }
+  }
+
   function toggleMode(mode: "addHierarchyLink" | "addRelatedLink") {
     if (activeMode === mode) {
       setActiveMode("idle");
@@ -804,6 +1044,131 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     } finally {
       setIsAttachmentPending(false);
     }
+  }
+
+  function renderBodySection(expanded = false) {
+    const canEditBody = Boolean(selectedCard && !selectedCard.isLocked);
+
+    return (
+      <section
+        className={expanded ? "detail-markdown detail-markdown--expanded" : "detail-markdown"}
+      >
+        <div className="detail-markdown__header">
+          <div>
+            <h3>本文ページ</h3>
+            <p className="muted">
+              Markdown
+              で構造化して書けます。見出し、箇条書き、チェックボックス、引用、コードブロックに対応します。
+            </p>
+          </div>
+          <div className="detail-markdown__modeButtons">
+            <button
+              className={bodyViewMode === "edit" ? "button button--accent" : "button button--ghost"}
+              onClick={() => setBodyViewMode("edit")}
+              type="button"
+            >
+              編集
+            </button>
+            <button
+              className={
+                bodyViewMode === "split" ? "button button--accent" : "button button--ghost"
+              }
+              onClick={() => setBodyViewMode("split")}
+              type="button"
+            >
+              分割
+            </button>
+            <button
+              className={
+                bodyViewMode === "preview" ? "button button--accent" : "button button--ghost"
+              }
+              onClick={() => setBodyViewMode("preview")}
+              type="button"
+            >
+              プレビュー
+            </button>
+            <button
+              className="button button--ghost"
+              onClick={() => setIsBodyExpanded((current) => !current)}
+              type="button"
+            >
+              {expanded ? "閉じる" : "大きく表示"}
+            </button>
+          </div>
+        </div>
+        <div className="detail-markdown__toolbar">
+          <button
+            className="button button--ghost"
+            onClick={() => handleApplyMarkdownBlock("# {選択}")}
+            type="button"
+          >
+            H1
+          </button>
+          <button
+            className="button button--ghost"
+            onClick={() => handleApplyMarkdownBlock("## {選択}")}
+            type="button"
+          >
+            H2
+          </button>
+          <button
+            className="button button--ghost"
+            onClick={() => handleApplyMarkdownBlock("- {選択}")}
+            type="button"
+          >
+            箇条書き
+          </button>
+          <button
+            className="button button--ghost"
+            onClick={() => handleApplyMarkdownBlock("- [ ] {選択}")}
+            type="button"
+          >
+            TODO
+          </button>
+          <button
+            className="button button--ghost"
+            onClick={() => handleApplyMarkdownBlock("> {選択}")}
+            type="button"
+          >
+            引用
+          </button>
+          <button
+            className="button button--ghost"
+            onClick={() => handleApplyMarkdownBlock("```\n{選択}\n```")}
+            type="button"
+          >
+            code
+          </button>
+        </div>
+        <div
+          className={
+            bodyViewMode === "split"
+              ? "detail-markdown__workspace detail-markdown__workspace--split"
+              : "detail-markdown__workspace"
+          }
+        >
+          {bodyViewMode !== "preview" ? (
+            <label className="field">
+              <span>Markdown 編集</span>
+              <textarea
+                className={expanded ? "textarea textarea--page" : "textarea textarea--markdown"}
+                disabled={!canEditBody}
+                onBlur={(event) => commitCardBody(event.target.value)}
+                onChange={(event) => setBodyDraft(event.target.value)}
+                ref={bodyTextareaRef}
+                value={bodyDraft}
+              />
+            </label>
+          ) : null}
+          {bodyViewMode !== "edit" ? (
+            <div className="detail-markdown__preview">
+              <span>プレビュー</span>
+              <div className="markdown-surface">{renderMarkdownDocument(bodyDraft)}</div>
+            </div>
+          ) : null}
+        </div>
+      </section>
+    );
   }
 
   return (
@@ -1080,26 +1445,52 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                   value={titleDraft}
                 />
               </label>
-              <label className="field">
-                <span>本文</span>
-                <textarea
-                  className="textarea"
-                  disabled={selectedCard.isLocked}
-                  onBlur={(event) => commitCardBody(event.target.value)}
-                  onChange={(event) => setBodyDraft(event.target.value)}
-                  value={bodyDraft}
-                />
-              </label>
-              <label className="field">
-                <span>タグ</span>
+              {renderBodySection()}
+              <section className="detail-tags">
+                <div className="detail-tags__header">
+                  <h3>タグ</h3>
+                  <p className="muted">Enter / Tab / カンマで追加できます。</p>
+                </div>
+                <div className="detail-tags__list">
+                  {selectedCard.tagNames.map((tag) => (
+                    <button
+                      className="tag-chip tag-chip--filled"
+                      disabled={selectedCard.isLocked}
+                      key={tag}
+                      onClick={() => handleRemoveTag(tag)}
+                      type="button"
+                    >
+                      #{tag} ×
+                    </button>
+                  ))}
+                  {!selectedCard.tagNames.length ? (
+                    <p className="muted">タグはありません。</p>
+                  ) : null}
+                </div>
                 <input
                   className="input"
                   disabled={selectedCard.isLocked}
-                  onBlur={(event) => commitCardTags(event.target.value)}
-                  onChange={(event) => setTagsDraft(event.target.value)}
-                  value={tagsDraft}
+                  onBlur={() => handleAddTag(tagInputDraft)}
+                  onChange={(event) => setTagInputDraft(event.target.value)}
+                  onKeyDown={handleTagInputKeyDown}
+                  placeholder="タグを追加"
+                  value={tagInputDraft}
                 />
-              </label>
+                <div className="tag-chip-list">
+                  {availableTags
+                    .filter((tag) => !selectedCard.tagNames.includes(tag))
+                    .map((tag) => (
+                      <button
+                        className="tag-chip"
+                        key={`suggestion-${tag}`}
+                        onClick={() => handleAddTag(tag)}
+                        type="button"
+                      >
+                        + #{tag}
+                      </button>
+                    ))}
+                </div>
+              </section>
               <div className="field">
                 <span>色</span>
                 <div className="editor-palette__colors">
@@ -1276,6 +1667,14 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           )}
         </aside>
       </section>
+
+      {selectedCard && isBodyExpanded ? (
+        <div className="overlay overlay--page" role="presentation">
+          <dialog aria-modal="true" className="modal modal--page" open>
+            {renderBodySection(true)}
+          </dialog>
+        </div>
+      ) : null}
 
       <CreateCardModal
         onCancel={() => setIsCreateModalOpen(false)}

@@ -377,3 +377,17 @@
   画像以外の PDF / TXT は引き続き `開く` 導線のみ。画像プレビューの並び順や大きさは実ブラウザで見え方を確認する必要がある。
 - 次のアクション:
   lint / build を通したうえで、この画像プレビュー改善をコミットして push する。
+
+## 2026-04-21 04:02
+- 変更内容:
+  `docs/opinion_by_toru.md` の意見を確認し、右パネルの本文編集を Markdown 前提のページ表示へ寄せた。本文は 編集 / 分割 / プレビュー を切り替えられ、見出しや箇条書きなどを挿入するツールバーと、大きく表示するページモーダルを追加した。タグ入力はカンマ文字列入力をやめ、複数チップ表示、Enter / Tab / カンマ追加、候補タグの再利用へ変更した。あわせてカード作成モーダルは Enter で確定できるようにし、関連仕様書も更新した。
+- 目的:
+  本文を書く意味が出る見え方と、複数タグを扱いやすい入力方式へ寄せて、実使用時の不満点を先に潰すため。
+- 影響範囲:
+  `frontend/`、`docs/`、`progress.md`
+- 関連ファイル:
+  `docs/opinion_by_toru.md`、`docs/specs/knowledge_canvas_frontend_spec_v1.0.md`、`docs/specs/knowledge_canvas_editor_interaction_spec_v1.0.md`、`frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/features/canvas-editor/components/create-card-modal.tsx`、`frontend/src/app/globals.css`、`progress.md`
+- 未解決事項:
+  Markdown プレビューは軽量実装のため、表やネストした記法までは未対応。本文の full-page 編集時により Notion らしいブロック操作を入れる余地がある。
+- 次のアクション:
+  lint / build を確認したうえで、この本文・タグ入力改善をコミットして push する。

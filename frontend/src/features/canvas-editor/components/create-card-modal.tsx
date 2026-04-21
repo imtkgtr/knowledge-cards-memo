@@ -30,6 +30,12 @@ export function CreateCardModal({ open, onCancel, onConfirm }: CreateCardModalPr
           <input
             className="input"
             onChange={(event) => setTitle(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && title.trim()) {
+                event.preventDefault();
+                onConfirm(title);
+              }
+            }}
             value={title}
           />
         </label>
