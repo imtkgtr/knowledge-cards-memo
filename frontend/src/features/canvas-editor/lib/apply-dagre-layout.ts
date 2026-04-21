@@ -8,12 +8,19 @@ type Position = {
   y: number;
 };
 
+type LayoutOptions = {
+  anchorCardId?: string | null;
+};
+
 const CARD_WIDTH = 220;
 const CARD_HEIGHT = 120;
 const NODE_SEPARATION = 56;
 const RANK_SEPARATION = 96;
 
-export function buildDagreLayout(document: CanvasDocument): Record<string, Position> {
+export function buildDagreLayout(
+  document: CanvasDocument,
+  options: LayoutOptions = {},
+): Record<string, Position> {
   const graph = new dagre.graphlib.Graph();
   graph.setDefaultEdgeLabel(() => ({}));
   graph.setGraph({
@@ -53,17 +60,21 @@ export function buildDagreLayout(document: CanvasDocument): Record<string, Posit
     };
   }
 
+  const childCardIds = new Set(document.hierarchyLinks.map((link) => link.childCardId));
+  const rootCards = document.cards.filter((card) => !childCardIds.has(card.id));
   const lockedCards = document.cards.filter((card) => card.isLocked);
-  if (lockedCards.length > 0) {
-    const anchor = lockedCards[0];
-    const anchorPosition = nextPositions[anchor.id];
-    if (anchorPosition) {
-      const deltaX = anchor.x - anchorPosition.x;
-      const deltaY = anchor.y - anchorPosition.y;
-      for (const position of Object.values(nextPositions)) {
-        position.x += deltaX;
-        position.y += deltaY;
-      }
+  const anchorCard =
+    document.cards.find((card) => card.id === options.anchorCardId) ??
+    rootCards[0] ??
+    lockedCards[0] ??
+    document.cards[0];
+  const anchorPosition = anchorCard ? nextPositions[anchorCard.id] : null;
+  if (anchorCard && anchorPosition) {
+    const deltaX = anchorCard.x - anchorPosition.x;
+    const deltaY = anchorCard.y - anchorPosition.y;
+    for (const position of Object.values(nextPositions)) {
+      position.x += deltaX;
+      position.y += deltaY;
     }
   }
 

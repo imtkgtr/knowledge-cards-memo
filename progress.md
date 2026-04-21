@@ -433,3 +433,17 @@
   関連リンクでも上下端子を共用しているため、専用の横向き handle まではまだない。実ブラウザでドラッグしやすさを確認して、必要なら handle の位置や色を追加調整する。
 - 次のアクション:
   lint / build を確認したうえで、このドラッグ接続導線をコミットして push する。
+
+## 2026-04-21 04:36
+- 変更内容:
+  自動整列の基準を見直し、選択中カードがある場合はその絶対座標を維持し、未選択時はルート親カードを優先して基準にするようにした。あわせて editor の左パレットと右詳細パネルの幅をドラッグまたは矢印キーで変更できる resizer を追加した。
+- 目的:
+  「親の絶対座標を変えずに整列させたい」「各パネルの大きさを変えたい」という意見を先に取り込み、編集レイアウトの自由度を上げるため。
+- 影響範囲:
+  `frontend/`、`docs/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/lib/apply-dagre-layout.ts`、`frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/app/globals.css`、`docs/specs/knowledge_canvas_editor_interaction_spec_v1.0.md`、`progress.md`
+- 未解決事項:
+  複数の親がいる複雑な階層では「どの親を優先固定するか」の最適化余地がある。パネル幅はセッション保存していないため、再読込で初期値に戻る。
+- 次のアクション:
+  lint / build を確認したうえで、この整列基準とパネルリサイズ改善をコミットして push する。

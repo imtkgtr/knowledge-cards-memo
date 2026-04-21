@@ -253,6 +253,8 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<string, string>>({});
   const [bodyViewMode, setBodyViewMode] = useState<BodyViewMode>("split");
   const [isBodyExpanded, setIsBodyExpanded] = useState(false);
+  const [paletteWidth, setPaletteWidth] = useState(220);
+  const [detailWidth, setDetailWidth] = useState(360);
   const [pendingLinkSourceId, setPendingLinkSourceId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isAttachmentPending, setIsAttachmentPending] = useState(false);
@@ -1017,13 +1019,45 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       return;
     }
 
-    const positions = buildDagreLayout(document);
+    const positions = buildDagreLayout(document, {
+      anchorCardId: selectedCardId,
+    });
     const changed = applyCardLayout(positions);
     setInteractionMessage(
       changed
-        ? "カードを自動整列しました。ロック中のカードは固定しています。"
+        ? "カードを自動整列しました。選択中カードまたは親カードの位置を基準に保っています。"
         : "整列対象のカード位置に変更はありませんでした。",
     );
+  }
+
+  function startPanelResize(target: "palette" | "detail", clientX: number) {
+    const startX = clientX;
+    const startWidth = target === "palette" ? paletteWidth : detailWidth;
+
+    function handlePointerMove(event: PointerEvent) {
+      const deltaX = event.clientX - startX;
+      if (target === "palette") {
+        setPaletteWidth(Math.min(320, Math.max(180, startWidth + deltaX)));
+        return;
+      }
+      setDetailWidth(Math.min(520, Math.max(280, startWidth - deltaX)));
+    }
+
+    function handlePointerUp() {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+  }
+
+  function nudgePanelWidth(target: "palette" | "detail", delta: number) {
+    if (target === "palette") {
+      setPaletteWidth((current) => Math.min(320, Math.max(180, current + delta)));
+      return;
+    }
+    setDetailWidth((current) => Math.min(520, Math.max(280, current + delta)));
   }
 
   async function getAccessToken() {
@@ -1354,7 +1388,12 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       {saveError ? <p className="notice notice--error">{saveError}</p> : null}
       {interactionMessage ? <p className="notice notice--success">{interactionMessage}</p> : null}
 
-      <section className="editor-layout">
+      <section
+        className="editor-layout"
+        style={{
+          gridTemplateColumns: `${paletteWidth}px 10px minmax(0, 1fr) 10px ${detailWidth}px`,
+        }}
+      >
         <aside className="editor-palette">
           <button
             className="button button--accent"
@@ -1462,6 +1501,24 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           </div>
         </aside>
 
+        <div
+          aria-label="左パネルの幅を変更"
+          className="editor-resizer"
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") {
+              event.preventDefault();
+              nudgePanelWidth("palette", -16);
+            }
+            if (event.key === "ArrowRight") {
+              event.preventDefault();
+              nudgePanelWidth("palette", 16);
+            }
+          }}
+          onPointerDown={(event) => startPanelResize("palette", event.clientX)}
+          role="separator"
+          tabIndex={0}
+        />
+
         <div className="editor-canvas" ref={canvasContainerRef}>
           <ReactFlow<KnowledgeCardNode, Edge>
             edges={edges}
@@ -1497,6 +1554,24 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             <MiniMap />
           </ReactFlow>
         </div>
+
+        <div
+          aria-label="右パネルの幅を変更"
+          className="editor-resizer"
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") {
+              event.preventDefault();
+              nudgePanelWidth("detail", 16);
+            }
+            if (event.key === "ArrowRight") {
+              event.preventDefault();
+              nudgePanelWidth("detail", -16);
+            }
+          }}
+          onPointerDown={(event) => startPanelResize("detail", event.clientX)}
+          role="separator"
+          tabIndex={0}
+        />
 
         <aside className="editor-detail">
           {selectedCard ? (

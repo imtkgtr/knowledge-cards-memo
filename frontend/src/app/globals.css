@@ -274,8 +274,20 @@ input {
 .editor-layout {
   min-height: calc(100vh - 200px);
   display: grid;
-  grid-template-columns: 160px minmax(0, 1fr) 320px;
+  grid-template-columns: 220px 10px minmax(0, 1fr) 10px 360px;
   gap: 16px;
+}
+
+.editor-resizer {
+  align-self: stretch;
+  width: 10px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(20, 92, 98, 0.08), rgba(20, 92, 98, 0.22));
+  cursor: col-resize;
+}
+
+.editor-resizer:hover {
+  background: linear-gradient(180deg, rgba(20, 92, 98, 0.18), rgba(20, 92, 98, 0.34));
 }
 
 .selection-toolbar {
@@ -808,6 +820,10 @@ input {
 
   .editor-layout {
     grid-template-columns: 1fr;
+  }
+
+  .editor-resizer {
+    display: none;
   }
 
   .detail-markdown__header {
