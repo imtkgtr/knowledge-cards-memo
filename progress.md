@@ -475,3 +475,17 @@
   この修正はフロントエンド内の状態保持と操作性改善に寄せたもので、別タブから同じキャンバスを同時編集した際の外部更新取り込みはまだ未対応。タグ入力もカンマ区切り中心であり、高度なタグ補完は未実装。
 - 次のアクション:
   `bun run lint` と `bun run build` で整合を確認したうえでコミットし、実ブラウザで autosave 後の選択保持、パネル幅保持、Markdown ページ表示、複数タグ追加を再確認する。
+
+## 2026-04-21 23:51
+- 変更内容:
+  React Flow の選択同期を見直し、空選択イベントを握りつぶす処理をやめたうえで、選択カード ID 配列を一意化・ソートしてから store に入れるようにした。これにより、選択順の揺れだけで `selectedCardIds` が更新され続ける経路を抑えた。
+- 目的:
+  タグ絞り込み周辺で発生していた `Maximum update depth exceeded` を解消し、選択状態の同期を React Flow と無理なく合わせるため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/stores/use-canvas-editor-store.ts`、`progress.md`
+- 未解決事項:
+  実ブラウザ上でタグ絞り込み、複数選択、空白クリック解除を通した最終確認はまだ必要。
+- 次のアクション:
+  `bun run lint` と `bun run build` の通過を確認したうえで、この再帰更新修正をコミットして push する。

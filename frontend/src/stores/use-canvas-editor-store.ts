@@ -160,6 +160,10 @@ function areCardIdsEqual(left: string[], right: string[]) {
   return left.every((cardId, index) => cardId === right[index]);
 }
 
+function normalizeSelectedCardIds(cardIds: string[]) {
+  return Array.from(new Set(cardIds)).sort((left, right) => left.localeCompare(right));
+}
+
 export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
   function updateDocument(
     label: string,
@@ -516,7 +520,7 @@ export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
     },
     selectCard: (selectedCardId) => {
       const state = get();
-      const nextSelectedCardIds = selectedCardId ? [selectedCardId] : [];
+      const nextSelectedCardIds = normalizeSelectedCardIds(selectedCardId ? [selectedCardId] : []);
       if (
         state.selectedCardId === selectedCardId &&
         areCardIdsEqual(state.selectedCardIds, nextSelectedCardIds)
@@ -543,16 +547,18 @@ export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
     setSaveState: (saveState, saveError = null) => set({ saveError, saveState }),
     setSelectedCardIds: (selectedCardIds) => {
       const state = get();
-      const nextSelectedCardId = selectedCardIds.length === 1 ? selectedCardIds[0] : null;
+      const normalizedSelectedCardIds = normalizeSelectedCardIds(selectedCardIds);
+      const nextSelectedCardId =
+        normalizedSelectedCardIds.length === 1 ? normalizedSelectedCardIds[0] : null;
       if (
         state.selectedCardId === nextSelectedCardId &&
-        areCardIdsEqual(state.selectedCardIds, selectedCardIds)
+        areCardIdsEqual(state.selectedCardIds, normalizedSelectedCardIds)
       ) {
         return;
       }
       set({
         selectedCardId: nextSelectedCardId,
-        selectedCardIds,
+        selectedCardIds: normalizedSelectedCardIds,
       });
     },
     toggleCardLock: (cardId) => {

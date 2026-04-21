@@ -1068,10 +1068,9 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   }
 
   function handleSelectionChange(ids: string[]) {
-    const nextSelectedIds = Array.from(new Set(ids));
-    if (nextSelectedIds.length === 0 && selectedCardIds.length > 0) {
-      return;
-    }
+    const nextSelectedIds = Array.from(new Set(ids)).sort((left, right) =>
+      left.localeCompare(right),
+    );
     setSelectedCardIds(nextSelectedIds);
     if (nextSelectedIds.length <= 1) {
       setInteractionMessage(null);
