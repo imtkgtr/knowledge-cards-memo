@@ -27,14 +27,24 @@ export function CardNode({ data, selected }: NodeProps<KnowledgeCardNode>) {
         .join(" ")}
       style={{ backgroundColor: data.color }}
     >
-      <Handle position={Position.Top} type="target" />
+      <Handle
+        className="card-node__handle card-node__handle--target"
+        isConnectable={!data.isLocked}
+        position={Position.Top}
+        type="target"
+      />
       <div className="card-node__header">
         <strong>{data.title}</strong>
         {data.isLocked ? <span className="card-node__meta">LOCK</span> : null}
       </div>
       {data.tagSummary ? <p className="card-node__meta">タグ: {data.tagSummary}</p> : null}
       <p className="card-node__meta">子リンク数: {data.childCount}</p>
-      <Handle position={Position.Bottom} type="source" />
+      <Handle
+        className="card-node__handle card-node__handle--source"
+        isConnectable={!data.isLocked}
+        position={Position.Bottom}
+        type="source"
+      />
     </div>
   );
 }

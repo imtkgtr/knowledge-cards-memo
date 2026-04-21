@@ -419,3 +419,17 @@
   OS クリップボードとの連携はしていないため、現在はアプリ内コピーのみ。添付ファイルまでは複製していない。
 - 次のアクション:
   lint / build を確認したうえで、このカード複製ショートカットをコミットして push する。
+
+## 2026-04-21 04:25
+- 変更内容:
+  左上でリンク種別を選んだ状態なら、カードの上下端子から別カードへ線をドラッグしてリンク追加できるようにした。handle 自体も大きくして視認性を上げ、パレット文言にも端子ドラッグ操作を案内するようにした。
+- 目的:
+  意見書にあった「カードから線を引いて簡単にリンクをつなげたい」「リンクのアイコンが小さい」をまとめて改善するため。
+- 影響範囲:
+  `frontend/`、`docs/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/features/canvas-editor/components/card-node.tsx`、`frontend/src/app/globals.css`、`docs/specs/knowledge_canvas_editor_interaction_spec_v1.0.md`、`progress.md`
+- 未解決事項:
+  関連リンクでも上下端子を共用しているため、専用の横向き handle まではまだない。実ブラウザでドラッグしやすさを確認して、必要なら handle の位置や色を追加調整する。
+- 次のアクション:
+  lint / build を確認したうえで、このドラッグ接続導線をコミットして push する。

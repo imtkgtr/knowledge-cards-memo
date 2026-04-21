@@ -620,6 +620,22 @@ input {
   box-shadow: 0 10px 24px rgba(41, 29, 10, 0.12);
 }
 
+.card-node__handle {
+  width: 18px !important;
+  height: 18px !important;
+  border: 3px solid #f8f5ec !important;
+  background: var(--accent) !important;
+  border-radius: 999px !important;
+}
+
+.card-node__handle--target {
+  top: -10px !important;
+}
+
+.card-node__handle--source {
+  bottom: -10px !important;
+}
+
 .card-node--selected {
   outline: 2px solid var(--accent);
   outline-offset: 2px;

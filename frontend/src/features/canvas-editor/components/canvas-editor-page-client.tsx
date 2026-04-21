@@ -2,6 +2,7 @@
 
 import {
   Background,
+  type Connection,
   Controls,
   type Edge,
   MarkerType,
@@ -960,6 +961,37 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     );
   }
 
+  function handleConnect(connection: Connection) {
+    if (!connection.source || !connection.target) {
+      return;
+    }
+    if (activeMode === "idle") {
+      setInteractionMessage("左上でリンク種別を選んでから、カードの端子をドラッグしてください。");
+      return;
+    }
+    if (connection.source === connection.target) {
+      setInteractionMessage("同じカード同士は接続できません。");
+      return;
+    }
+
+    selectCard(connection.source);
+    setPendingLinkSourceId(connection.source);
+    const wasAdded =
+      activeMode === "addHierarchyLink"
+        ? addHierarchyLink(connection.source, connection.target)
+        : addRelatedLink(connection.source, connection.target);
+    setPendingLinkSourceId(connection.source);
+    setInteractionMessage(
+      wasAdded
+        ? activeMode === "addHierarchyLink"
+          ? "階層リンクを追加しました。起点は維持しています。"
+          : "通常リンクを追加しました。起点は維持しています。"
+        : activeMode === "addHierarchyLink"
+          ? "階層リンクを追加できませんでした。重複、循環、ロック状態を確認してください。"
+          : "通常リンクを追加できませんでした。重複またはロック状態を確認してください。",
+    );
+  }
+
   function handleSelectionChange(ids: string[]) {
     setSelectedCardIds(ids);
     if (ids.length <= 1) {
@@ -1350,12 +1382,15 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             通常リンク追加
           </button>
           {activeMode !== "idle" ? (
-            <p className="muted">
-              起点:{" "}
-              {pendingLinkSourceId
-                ? findCardLabel(document ?? null, pendingLinkSourceId)
-                : "未選択"}
-            </p>
+            <>
+              <p className="muted">
+                起点:{" "}
+                {pendingLinkSourceId
+                  ? findCardLabel(document ?? null, pendingLinkSourceId)
+                  : "未選択"}
+              </p>
+              <p className="muted">カード上下の端子から線を引いて接続できます。</p>
+            </>
           ) : null}
           <button
             className="button button--ghost"
@@ -1443,6 +1478,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               removeRelatedLink(edge.id);
             }}
             onEdgesChange={onEdgesChange}
+            onConnect={handleConnect}
             onNodeClick={(_, node) => handleNodeClick(node.id)}
             onNodeDragStop={(_, node) => moveCard(node.id, node.position.x, node.position.y)}
             onNodesChange={onNodesChange}
