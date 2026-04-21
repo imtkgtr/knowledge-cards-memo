@@ -531,3 +531,17 @@
   位置更新は `onNodeDragStop` ベースのままであり、ドラッグ中の中間 state を別管理する構成ではない。必要なら後で最適化する。
 - 次のアクション:
   `bun run lint` と `bun run build` の通過を確認したうえでコミットし、実ブラウザで editor 初期表示とカード選択・ドラッグが安定するかを再確認する。
+
+## 2026-04-22 01:09
+- 変更内容:
+  frontend に `@playwright/test` を導入し、`playwright.config.ts` と smoke test `frontend/tests/e2e/canvas-editor-smoke.spec.ts` を追加した。テストでは backend の `.env` から Supabase 接続情報を読み、confirmed user を admin API で先に作成してから UI ログインし、キャンバス作成、editor 表示、カード追加までを通している。あわせて、React Flow の `selected` 制御と `onSelectionChange` の同期を外し、editor マウント時に再発していた runtime error を抑えた。Biome は `test-results` と `playwright-report` を無視するよう更新した。
+- 目的:
+  「Playwright を使って実動作を確認しながら実装する」ための最低限の E2E 基盤を入れ、実ブラウザで再現した editor の runtime error を継続的に検知できるようにするため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/package.json`、`frontend/bun.lock`、`frontend/biome.json`、`frontend/playwright.config.ts`、`frontend/tests/e2e/canvas-editor-smoke.spec.ts`、`frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`progress.md`
+- 未解決事項:
+  現在の smoke test は複数選択やリンク追加までは見ていない。editor の詳細回帰は今後シナリオを増やしていく必要がある。
+- 次のアクション:
+  今回の E2E 基盤と editor 安定化をコミットし、次はリンク追加やパネルリサイズも Playwright シナリオへ広げる。

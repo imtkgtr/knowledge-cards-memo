@@ -13,3 +13,5 @@ node_modules/
 .next/
 coverage/
 dist/
+frontend/test-results/
+frontend/playwright-report/

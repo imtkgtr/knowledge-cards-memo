@@ -354,7 +354,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         type: "knowledgeCard",
         position: { x: card.x, y: card.y },
         draggable: !card.isLocked,
-        selected: selectedCardIds.includes(card.id),
         selectable: true,
         data: {
           title: card.title,
@@ -366,7 +365,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           tagSummary: card.tagNames.slice(0, 2).join(", "),
         },
       })),
-    [activeHighlightTag, selectedCardIds, visibleCards],
+    [activeHighlightTag, visibleCards],
   );
 
   const edgesFromDocument = useMemo<Edge[]>(
@@ -1437,9 +1436,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               setActiveMode("idle");
               setInteractionMessage(null);
             }}
-            onSelectionChange={({ nodes: currentNodes }) =>
-              handleSelectionChange(currentNodes.map((node) => node.id))
-            }
             selectionKeyCode={["Meta", "Control", "Shift"]}
           >
             <Background gap={20} size={1} />
