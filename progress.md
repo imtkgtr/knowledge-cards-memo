@@ -237,3 +237,17 @@
   シェルから取得したトークンでの直接 `curl` は 401 だったため、proxy 経路の最終確認はブラウザセッション前提で見る必要がある。hydrate mismatch が完全に解消したかは、一覧画面を再読み込みしてブラウザ側で再確認が必要。
 - 次のアクション:
   今回の一覧修正をコミットして push し、ブラウザで新規作成と一覧再読み込みを再確認したうえで次機能へ進む。
+
+## 2026-04-21 00:39
+- 変更内容:
+  `getBrowserProxyPath()` に path 正規化を追加し、呼び出し側が誤って `/api/canvases` を渡しても `/api/backend/canvases` へ補正されるようにした。
+- 目的:
+  一覧画面以外に古い呼び出しが残っていても `api/backend/api/...` の二重パスで 404 にならないようにし、proxy 経路の再発防止を入れるため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/lib/api/backend.ts`、`progress.md`
+- 未解決事項:
+  ブラウザ側で読み込まれている bundle が古い場合は、hard reload か dev server 再起動が必要な可能性がある。hydrate mismatch については再読込後のブラウザ確認がまだ必要。
+- 次のアクション:
+  この再発防止をコミットして push し、ブラウザで `/canvases` を強制再読み込みして 404 が消えることを確認する。

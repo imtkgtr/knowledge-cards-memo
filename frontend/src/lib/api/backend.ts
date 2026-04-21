@@ -19,7 +19,14 @@ export function getBackendPublicUrl() {
 }
 
 export function getBrowserProxyPath(path: string) {
-  return `${browserProxyBasePath}${path}`;
+  const normalizedPath = path.startsWith("/api/")
+    ? path.slice(4)
+    : path.startsWith("api/")
+      ? `/${path.slice(4)}`
+      : path.startsWith("/")
+        ? path
+        : `/${path}`;
+  return `${browserProxyBasePath}${normalizedPath}`;
 }
 
 export async function serverFetchCanvases(accessToken: string): Promise<CanvasSummary[]> {
