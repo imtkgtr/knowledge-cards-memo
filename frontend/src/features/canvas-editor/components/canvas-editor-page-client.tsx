@@ -14,14 +14,17 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
+  clientClearCanvasThumbnail,
   clientDeleteAttachment,
   clientGetAttachmentAccessUrl,
   clientSaveCanvasDocument,
   clientUploadAttachment,
+  clientUploadCanvasThumbnail,
 } from "@/lib/api/backend";
 import type { CanvasDocument } from "@/lib/api/types";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { useCanvasEditorStore } from "@/stores/use-canvas-editor-store";
+import { toBlob } from "html-to-image";
 import Link from "next/link";
 import { useEffect, useEffectEvent, useMemo, useRef, useState, useTransition } from "react";
 import { buildDagreLayout } from "../lib/apply-dagre-layout";
@@ -33,6 +36,7 @@ type CanvasEditorPageClientProps = {
 };
 
 const colorChoices = ["#eed9b6", "#cfe5e7", "#f4d8d8", "#dceac8", "#efe0ff"];
+const thumbnailAutoSyncIntervalMs = 60 * 1000;
 const nodeTypes: NodeTypes = {
   knowledgeCard: CardNode,
 };
@@ -69,10 +73,12 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [pendingLinkSourceId, setPendingLinkSourceId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isAttachmentPending, setIsAttachmentPending] = useState(false);
+  const [isThumbnailPending, setIsThumbnailPending] = useState(false);
   const [tagsDraft, setTagsDraft] = useState("");
   const [titleDraft, setTitleDraft] = useState("");
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
+  const lastThumbnailSyncedAtRef = useRef(0);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<
     KnowledgeCardNode,
     Edge
@@ -228,6 +234,16 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   }, [document?.cards, searchQuery]);
   const canUndo = historyIndex >= 0;
   const canRedo = historyIndex < history.length - 1;
+  const saveStatusLabel =
+    saveState === "saving"
+      ? "自動保存中..."
+      : isThumbnailPending
+        ? "サムネイル更新中..."
+        : isDirty
+          ? "未保存の変更あり"
+          : lastSavedAt
+            ? `保存済み (${formatDate(lastSavedAt)})`
+            : "-";
   const selectedAttachments = useMemo(
     () =>
       (document?.attachments ?? []).filter((attachment) => attachment.cardId === selectedCard?.id),
@@ -467,6 +483,61 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     setInteractionMessage(createdCardId ? "カードを追加しました。" : null);
   }
 
+  async function syncCanvasThumbnail(accessToken: string, isAutoSave: boolean) {
+    if (!document || isThumbnailPending) {
+      return;
+    }
+
+    if (isAutoSave && Date.now() - lastThumbnailSyncedAtRef.current < thumbnailAutoSyncIntervalMs) {
+      return;
+    }
+
+    if (document.cards.length === 0) {
+      try {
+        await clientClearCanvasThumbnail(accessToken, document.canvas.id);
+        lastThumbnailSyncedAtRef.current = Date.now();
+      } catch (error) {
+        setInteractionMessage(
+          error instanceof Error ? error.message : "サムネイルの削除に失敗しました。",
+        );
+      }
+      return;
+    }
+
+    const captureTarget = canvasContainerRef.current;
+    if (!captureTarget) {
+      return;
+    }
+
+    setIsThumbnailPending(true);
+    try {
+      const blob = await toBlob(captureTarget, {
+        backgroundColor: "#f7f0df",
+        cacheBust: true,
+        pixelRatio: 1,
+        filter: (node) =>
+          !(
+            node instanceof HTMLElement &&
+            (node.classList.contains("react-flow__controls") ||
+              node.classList.contains("react-flow__minimap") ||
+              node.classList.contains("react-flow__attribution"))
+          ),
+      });
+      if (!blob) {
+        throw new Error("サムネイル画像を生成できませんでした。");
+      }
+      const file = new File([blob], "thumbnail.png", { type: "image/png" });
+      await clientUploadCanvasThumbnail(accessToken, document.canvas.id, file);
+      lastThumbnailSyncedAtRef.current = Date.now();
+    } catch (error) {
+      setInteractionMessage(
+        error instanceof Error ? error.message : "サムネイルの更新に失敗しました。",
+      );
+    } finally {
+      setIsThumbnailPending(false);
+    }
+  }
+
   async function handleSave(isAutoSave = false) {
     if (!document) {
       return;
@@ -492,6 +563,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           document,
         );
         markSaved(saved.canvas.updatedAt);
+        void syncCanvasThumbnail(session.access_token, isAutoSave);
         if (!isAutoSave) {
           setSaveMessage("保存しました。");
         }
@@ -688,14 +760,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             value={canvasNameDraft}
           />
           <p className="muted">
-            カード数: {document?.cards.length ?? 0} / 保存状態:{" "}
-            {saveState === "saving"
-              ? "自動保存中..."
-              : isDirty
-                ? "未保存の変更あり"
-                : lastSavedAt
-                  ? `保存済み (${formatDate(lastSavedAt)})`
-                  : "-"}
+            カード数: {document?.cards.length ?? 0} / 保存状態: {saveStatusLabel}
           </p>
         </div>
         <div className="editor-topbar__actions">

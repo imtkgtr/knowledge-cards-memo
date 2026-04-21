@@ -78,8 +78,19 @@ class CanvasRepository(Protocol):
         expires_in: int,
     ) -> str | None: ...
 
+    def upload_thumbnail(
+        self,
+        user_id: str,
+        canvas_id: str,
+        file_bytes: bytes,
+        mime_type: str,
+    ) -> CanvasSummarySchema | None: ...
+
+    def clear_thumbnail(self, user_id: str, canvas_id: str) -> bool: ...
+
 
 ATTACHMENT_BUCKET_NAME = "card-attachments"
+THUMBNAIL_BUCKET_NAME = "canvas-thumbnails"
 
 
 @dataclass(slots=True)
@@ -101,13 +112,7 @@ class SupabaseCanvasRepository:
             .execute()
         )
         return [
-            CanvasSummarySchema(
-                id=row["id"],
-                name=row["name"],
-                thumbnail_url=row.get("thumbnail_path"),
-                updated_at=row["updated_at"],
-                created_at=row["created_at"],
-            )
+            self._to_canvas_summary_schema(row)
             for row in response.data or []
         ]
 
@@ -118,13 +123,7 @@ class SupabaseCanvasRepository:
             .execute()
         )
         row = response.data[0]
-        return CanvasSummarySchema(
-            id=row["id"],
-            name=row["name"],
-            thumbnail_url=row.get("thumbnail_path"),
-            updated_at=row["updated_at"],
-            created_at=row["created_at"],
-        )
+        return self._to_canvas_summary_schema(row)
 
     def update_canvas(
         self,
@@ -450,6 +449,56 @@ class SupabaseCanvasRepository:
         )
         return response["signedURL"]
 
+    def upload_thumbnail(
+        self,
+        user_id: str,
+        canvas_id: str,
+        file_bytes: bytes,
+        mime_type: str,
+    ) -> CanvasSummarySchema | None:
+        canvas = self._get_canvas_row(user_id, canvas_id)
+        if canvas is None:
+            return None
+
+        storage_path = self._build_thumbnail_path(user_id, canvas_id)
+        self._ensure_thumbnail_bucket()
+        self.client.storage.from_(THUMBNAIL_BUCKET_NAME).upload(
+            storage_path,
+            file_bytes,
+            {"content-type": mime_type, "x-upsert": "true"},
+        )
+        response = (
+            self.client.table("canvases")
+            .update({"thumbnail_path": storage_path})
+            .eq("id", canvas_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        if not response.data:
+            return None
+        return self._to_canvas_summary_schema(response.data[0])
+
+    def clear_thumbnail(self, user_id: str, canvas_id: str) -> bool:
+        canvas = self._get_canvas_row(user_id, canvas_id)
+        if canvas is None:
+            return False
+
+        thumbnail_path = canvas.get("thumbnail_path")
+        if not thumbnail_path:
+            return True
+
+        self._ensure_thumbnail_bucket()
+        self.client.storage.from_(THUMBNAIL_BUCKET_NAME).remove([thumbnail_path])
+
+        response = (
+            self.client.table("canvases")
+            .update({"thumbnail_path": None})
+            .eq("id", canvas_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        return bool(response.data)
+
     def _get_canvas_row(self, user_id: str, canvas_id: str) -> dict | None:
         response = (
             self.client.table("canvases")
@@ -514,6 +563,19 @@ class SupabaseCanvasRepository:
                 },
             )
 
+    def _ensure_thumbnail_bucket(self) -> None:
+        try:
+            self.client.storage.get_bucket(THUMBNAIL_BUCKET_NAME)
+        except Exception:
+            self.client.storage.create_bucket(
+                THUMBNAIL_BUCKET_NAME,
+                options={
+                    "public": True,
+                    "file_size_limit": 5 * 1024 * 1024,
+                    "allowed_mime_types": ["image/png", "image/jpeg", "image/webp"],
+                },
+            )
+
     @staticmethod
     def _build_attachment_path(
         user_id: str,
@@ -529,8 +591,26 @@ class SupabaseCanvasRepository:
         return f"{user_id}/{canvas_id}/{card_id}/{attachment_id}-{sanitized_name}"
 
     @staticmethod
+    def _build_thumbnail_path(user_id: str, canvas_id: str) -> str:
+        return f"{user_id}/{canvas_id}/latest.png"
+
+    @staticmethod
     def _to_canvas_schema(row: dict) -> CanvasSchema:
         return CanvasSchema.model_validate(row)
+
+    def _to_canvas_summary_schema(self, row: dict) -> CanvasSummarySchema:
+        return CanvasSummarySchema(
+            id=row["id"],
+            name=row["name"],
+            thumbnail_url=self._resolve_thumbnail_url(row.get("thumbnail_path")),
+            updated_at=row["updated_at"],
+            created_at=row["created_at"],
+        )
+
+    def _resolve_thumbnail_url(self, thumbnail_path: str | None) -> str | None:
+        if not thumbnail_path:
+            return None
+        return self.client.storage.from_(THUMBNAIL_BUCKET_NAME).get_public_url(thumbnail_path)
 
 
 @dataclass(slots=True)
@@ -725,6 +805,36 @@ class MemoryCanvasRepository:
                 if item["id"] == attachment_id:
                     return f"https://example.test/attachments/{attachment_id}?expires_in={expires_in}"
         return None
+
+    def upload_thumbnail(
+        self,
+        user_id: str,
+        canvas_id: str,
+        file_bytes: bytes,
+        mime_type: str,
+    ) -> CanvasSummarySchema | None:
+        row = self.canvases.get(canvas_id)
+        if row is None or row["user_id"] != user_id:
+            return None
+        row["thumbnail_path"] = f"https://example.test/thumbnails/{canvas_id}/latest.png"
+        row["updated_at"] = datetime.now(tz=UTC)
+        return CanvasSummarySchema(
+            id=row["id"],
+            name=row["name"],
+            thumbnail_url=row["thumbnail_path"],
+            updated_at=row["updated_at"],
+            created_at=row["created_at"],
+        )
+
+    def clear_thumbnail(self, user_id: str, canvas_id: str) -> bool:
+        row = self.canvases.get(canvas_id)
+        if row is None or row["user_id"] != user_id:
+            return False
+        if row["thumbnail_path"] is None:
+            return True
+        row["thumbnail_path"] = None
+        row["updated_at"] = datetime.now(tz=UTC)
+        return True
 
 
 def build_memory_canvas_repository() -> MemoryCanvasRepository:

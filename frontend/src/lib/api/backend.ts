@@ -161,6 +161,52 @@ export async function clientUploadAttachment(
   return data.attachment;
 }
 
+export async function clientUploadCanvasThumbnail(
+  accessToken: string,
+  canvasId: string,
+  file: File,
+): Promise<CanvasSummary> {
+  const formData = new FormData();
+  formData.set("file", file);
+
+  const response = await fetch(getBrowserProxyPath(`/canvases/${canvasId}/thumbnail`), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      detail?: { message?: string };
+    } | null;
+    throw new Error(payload?.detail?.message ?? "サムネイルの更新に失敗しました。");
+  }
+
+  const data = (await response.json()) as { canvas: CanvasSummary };
+  return data.canvas;
+}
+
+export async function clientClearCanvasThumbnail(
+  accessToken: string,
+  canvasId: string,
+): Promise<void> {
+  const response = await fetch(getBrowserProxyPath(`/canvases/${canvasId}/thumbnail`), {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      detail?: { message?: string };
+    } | null;
+    throw new Error(payload?.detail?.message ?? "サムネイルの削除に失敗しました。");
+  }
+}
+
 export async function clientDeleteAttachment(
   accessToken: string,
   attachmentId: string,

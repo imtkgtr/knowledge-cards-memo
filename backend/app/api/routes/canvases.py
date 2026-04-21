@@ -125,3 +125,28 @@ async def add_attachment(
 ) -> AttachmentResponse:
     attachment = service.add_attachment(user, canvas_id, card_id, file, await file.read())
     return AttachmentResponse(attachment=attachment)
+
+
+@router.post(
+    "/{canvas_id}/thumbnail",
+    response_model=CanvasSummaryResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_thumbnail(
+    canvas_id: str,
+    file: UploadFile = File(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    service: CanvasService = Depends(get_canvas_service),
+) -> CanvasSummaryResponse:
+    updated = service.upload_thumbnail(user, canvas_id, file, await file.read())
+    return CanvasSummaryResponse(canvas=updated)
+
+
+@router.delete("/{canvas_id}/thumbnail", status_code=status.HTTP_204_NO_CONTENT)
+def clear_thumbnail(
+    canvas_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    service: CanvasService = Depends(get_canvas_service),
+) -> Response:
+    service.clear_thumbnail(user, canvas_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

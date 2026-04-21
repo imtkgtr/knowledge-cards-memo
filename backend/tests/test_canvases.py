@@ -424,3 +424,29 @@ def test_attachment_crud_flow() -> None:
 
     delete_response = context.client.delete(f"/api/attachments/{attachment['id']}")
     assert delete_response.status_code == 204
+
+
+def test_thumbnail_crud_flow() -> None:
+    context = build_test_context()
+    created = context.client.post("/api/canvases", json={"name": "サムネイルテスト"}).json()["canvas"]
+    canvas_id = created["id"]
+
+    upload_response = context.client.post(
+        f"/api/canvases/{canvas_id}/thumbnail",
+        files={"file": ("thumbnail.png", b"fake-png-bytes", "image/png")},
+    )
+    assert upload_response.status_code == 201
+    uploaded = upload_response.json()["canvas"]
+    assert uploaded["thumbnailUrl"] is not None
+    assert canvas_id in uploaded["thumbnailUrl"]
+
+    list_response = context.client.get("/api/canvases")
+    assert list_response.status_code == 200
+    assert list_response.json()[0]["thumbnailUrl"] is not None
+
+    clear_response = context.client.delete(f"/api/canvases/{canvas_id}/thumbnail")
+    assert clear_response.status_code == 204
+
+    list_after_clear = context.client.get("/api/canvases")
+    assert list_after_clear.status_code == 200
+    assert list_after_clear.json()[0]["thumbnailUrl"] is None

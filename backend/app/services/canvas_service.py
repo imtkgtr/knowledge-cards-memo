@@ -34,6 +34,7 @@ class CanvasService:
     max_attachments_per_card: int = 10
     max_attachment_total_size_bytes: int = 10 * 1024 * 1024
     attachment_url_expires_in: int = 3600
+    max_thumbnail_size_bytes: int = 5 * 1024 * 1024
 
     def list_canvases(self, user: AuthenticatedUser) -> list[CanvasSummarySchema]:
         return self._with_storage_guard(
@@ -275,6 +276,42 @@ class CanvasService:
         if url is None:
             raise self._attachment_not_found()
         return AttachmentAccessResponse(url=url, expires_in=self.attachment_url_expires_in)
+
+    def upload_thumbnail(
+        self,
+        user: AuthenticatedUser,
+        canvas_id: str,
+        upload_file: UploadFile,
+        file_bytes: bytes,
+    ) -> CanvasSummarySchema:
+        if not file_bytes:
+            raise self._invalid_payload("サムネイル画像が空です。")
+        if len(file_bytes) > self.max_thumbnail_size_bytes:
+            raise self._invalid_payload("サムネイル画像が大きすぎます。")
+
+        mime_type = upload_file.content_type or "application/octet-stream"
+        if mime_type not in {"image/png", "image/jpeg", "image/webp"}:
+            raise self._invalid_payload("サムネイルは PNG / JPEG / WEBP のみ保存できます。")
+
+        updated = self._with_storage_guard(
+            lambda: self._prepare_profile_and_run(
+                user,
+                lambda: self.repository.upload_thumbnail(user.id, canvas_id, file_bytes, mime_type),
+            )
+        )
+        if updated is None:
+            raise self._not_found()
+        return updated
+
+    def clear_thumbnail(self, user: AuthenticatedUser, canvas_id: str) -> None:
+        cleared = self._with_storage_guard(
+            lambda: self._prepare_profile_and_run(
+                user,
+                lambda: self.repository.clear_thumbnail(user.id, canvas_id),
+            )
+        )
+        if not cleared:
+            raise self._not_found()
 
     def _prepare_profile_and_run(self, user: AuthenticatedUser, callback):
         self.repository.ensure_profile(user.id, user.email)

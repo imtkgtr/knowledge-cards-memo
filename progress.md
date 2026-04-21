@@ -349,3 +349,17 @@
   実ブラウザで連続リンク追加、モード切替時の起点引き継ぎ、関連リンクの視認性を最終確認する必要がある。
 - 次のアクション:
   lint / build を通し、今回の連続リンク操作改善をコミットして push する。
+
+## 2026-04-21 03:18
+- 変更内容:
+  キャンバス一覧用サムネイルの upload / clear API を backend に追加し、`canvas-thumbnails` バケットへ保存できるようにした。一覧取得時は storage path から public URL を組み立てて返す。frontend には `html-to-image` を導入し、保存成功後に editor 表示領域からサムネイル画像を生成して自動送信する処理を追加した。カードが 0 件のときはサムネイル削除に切り替える。あわせて API 仕様書と backend テストを更新した。
+- 目的:
+  フェーズ 7 の未完了だった「一覧サムネイルが更新される」を実装し、キャンバス一覧から内容を視覚的に識別しやすくするため。
+- 影響範囲:
+  `backend/`、`frontend/`、`docs/`、`progress.md`
+- 関連ファイル:
+  `backend/app/api/routes/canvases.py`、`backend/app/infrastructure/canvas_repository.py`、`backend/app/services/canvas_service.py`、`backend/tests/test_canvases.py`、`frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/lib/api/backend.ts`、`frontend/package.json`、`frontend/bun.lock`、`docs/specs/knowledge_canvas_api_spec_v1.0.md`、`progress.md`
+- 未解決事項:
+  現在のサムネイルは editor の表示領域ベースで生成しており、キャンバス全体を必ず fit した縮小画像ではない。実ブラウザで生成結果の見え方と保存頻度を確認する必要がある。
+- 次のアクション:
+  lint / build / backend test を確認したうえで、このサムネイル自動更新機能をコミットして push する。
