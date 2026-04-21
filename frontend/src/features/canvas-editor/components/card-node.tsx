@@ -1,6 +1,7 @@
 "use client";
 
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
+import type { CSSProperties } from "react";
 
 type CardNodeData = {
   childCount: number;
@@ -15,6 +16,7 @@ type CardNodeData = {
 export type KnowledgeCardNode = Node<CardNodeData, "knowledgeCard">;
 
 export function CardNode({ data, selected }: NodeProps<KnowledgeCardNode>) {
+  const visualWeight = Math.min(data.childCount, 6);
   return (
     <div
       className={[
@@ -25,7 +27,12 @@ export function CardNode({ data, selected }: NodeProps<KnowledgeCardNode>) {
       ]
         .filter(Boolean)
         .join(" ")}
-      style={{ backgroundColor: data.color }}
+      style={
+        {
+          backgroundColor: data.color,
+          "--card-node-child-weight": visualWeight,
+        } as CSSProperties
+      }
     >
       <Handle
         className="card-node__handle card-node__handle--target"
