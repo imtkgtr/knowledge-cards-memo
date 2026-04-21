@@ -517,3 +517,17 @@
   editor を client-only にしたため、初回表示は SSR 時より少し遅く見える可能性がある。必要なら後で skeleton や loading を追加する。
 - 次のアクション:
   `bun run lint` と `bun run build` の通過を確認したうえでコミットし、実ブラウザで hydration エラー消失とパネルリサイズ可否を再確認する。
+
+## 2026-04-22 00:20
+- 変更内容:
+  React Flow の `nodes` / `edges` を store 由来の計算値と `useNodesState` / `useEdgesState` で二重管理していた構成をやめ、`nodesFromDocument` と `edgesFromDocument` をそのまま渡す単一ソース構成へ戻した。これにより、React Flow 内部イベントと外部 state 同期が循環しやすい経路を削った。
+- 目的:
+  `Maximum update depth exceeded` が editor マウント直後に再発していたため、React Flow の state 同期ループを根本から減らすため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`progress.md`
+- 未解決事項:
+  位置更新は `onNodeDragStop` ベースのままであり、ドラッグ中の中間 state を別管理する構成ではない。必要なら後で最適化する。
+- 次のアクション:
+  `bun run lint` と `bun run build` の通過を確認したうえでコミットし、実ブラウザで editor 初期表示とカード選択・ドラッグが安定するかを再確認する。

@@ -10,8 +10,6 @@ import {
   type NodeTypes,
   ReactFlow,
   type ReactFlowInstance,
-  useEdgesState,
-  useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
@@ -399,17 +397,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     ],
     [document?.hierarchyLinks, document?.relatedLinks, visibleCardIds],
   );
-
-  const [nodes, setNodes, onNodesChange] = useNodesState(nodesFromDocument);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(edgesFromDocument);
-
-  useEffect(() => {
-    setNodes(nodesFromDocument);
-  }, [nodesFromDocument, setNodes]);
-
-  useEffect(() => {
-    setEdges(edgesFromDocument);
-  }, [edgesFromDocument, setEdges]);
 
   const selectedCard = useMemo(
     () => document?.cards.find((card) => card.id === selectedCardId) ?? null,
@@ -1429,11 +1416,11 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
 
         <div className="editor-canvas" ref={canvasContainerRef}>
           <ReactFlow<KnowledgeCardNode, Edge>
-            edges={edges}
+            edges={edgesFromDocument}
             fitView
             multiSelectionKeyCode={["Meta", "Control", "Shift"]}
             nodeTypes={nodeTypes}
-            nodes={nodes}
+            nodes={nodesFromDocument}
             onInit={setReactFlowInstance}
             onEdgeClick={(_, edge) => {
               if (edge.data?.kind === "hierarchy") {
@@ -1442,11 +1429,9 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               }
               removeRelatedLink(edge.id);
             }}
-            onEdgesChange={onEdgesChange}
             onConnect={handleConnect}
             onNodeClick={(_, node) => handleNodeClick(node.id)}
             onNodeDragStop={(_, node) => moveCard(node.id, node.position.x, node.position.y)}
-            onNodesChange={onNodesChange}
             onPaneClick={() => {
               selectCard(null);
               setActiveMode("idle");
