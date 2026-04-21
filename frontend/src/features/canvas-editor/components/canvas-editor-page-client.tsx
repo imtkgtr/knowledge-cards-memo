@@ -71,6 +71,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [tagsDraft, setTagsDraft] = useState("");
   const [titleDraft, setTitleDraft] = useState("");
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<
     KnowledgeCardNode,
     Edge
@@ -272,6 +273,20 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     visibleCardIds,
   ]);
 
+  useEffect(() => {
+    if (!selectedCardId || !reactFlowInstance) {
+      return;
+    }
+    const card = document?.cards.find((item) => item.id === selectedCardId);
+    if (!card) {
+      return;
+    }
+    reactFlowInstance.setCenter(card.x + 120, card.y + 80, {
+      duration: 250,
+      zoom: Math.max(reactFlowInstance.getZoom(), 0.95),
+    });
+  }, [document?.cards, reactFlowInstance, selectedCardId]);
+
   const commitCanvasName = useEffectEvent((value: string) => {
     const currentName = document?.canvas.name ?? "";
     const nextName = value.trim();
@@ -424,13 +439,31 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   }, [document, isDirty, saveState]);
 
   function handleCreateCard(title: string) {
-    createCard({
-      title,
+    const canvasBounds = canvasContainerRef.current?.getBoundingClientRect();
+    const defaultPosition = {
       x: 160 + (document?.cards.length ?? 0) * 20,
       y: 120 + (document?.cards.length ?? 0) * 20,
+    };
+    const centerPosition =
+      reactFlowInstance && canvasBounds
+        ? reactFlowInstance.screenToFlowPosition({
+            x: canvasBounds.left + canvasBounds.width / 2 - 120,
+            y: canvasBounds.top + canvasBounds.height / 2 - 80,
+          })
+        : defaultPosition;
+
+    const createdCardId = createCard({
+      title,
+      x: centerPosition.x,
+      y: centerPosition.y,
     });
     setIsCreateModalOpen(false);
-    setInteractionMessage(null);
+    if (activeFilterTag) {
+      setActiveFilterTag(null);
+      setInteractionMessage("カードを追加しました。絞り込みは解除しています。");
+      return;
+    }
+    setInteractionMessage(createdCardId ? "カードを追加しました。" : null);
   }
 
   async function handleSave(isAutoSave = false) {
@@ -836,7 +869,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           </div>
         </aside>
 
-        <div className="editor-canvas">
+        <div className="editor-canvas" ref={canvasContainerRef}>
           <ReactFlow<KnowledgeCardNode, Edge>
             edges={edges}
             fitView

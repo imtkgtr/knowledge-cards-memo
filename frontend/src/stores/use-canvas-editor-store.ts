@@ -35,7 +35,7 @@ type CanvasEditorState = {
   bulkDeleteCards: (cardIds: string[]) => void;
   bulkSetColor: (cardIds: string[], color: string) => void;
   bulkToggleLock: (cardIds: string[], isLocked: boolean) => void;
-  createCard: (input: { body?: string; title: string; x: number; y: number }) => void;
+  createCard: (input: { body?: string; title: string; x: number; y: number }) => string | null;
   loadDocument: (document: CanvasDocument) => void;
   markSaved: (savedAt?: string | null) => void;
   moveCard: (cardId: string, x: number, y: number) => void;
@@ -351,13 +351,14 @@ export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
         });
       });
       if (!didCreate) {
-        return;
+        return null;
       }
       set({
         activeMode: "idle",
         selectedCardId: cardId,
         selectedCardIds: [cardId],
       });
+      return cardId;
     },
     loadDocument: (document) =>
       set({
