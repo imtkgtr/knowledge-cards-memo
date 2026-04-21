@@ -49,6 +49,11 @@ type BodyViewMode = "edit" | "preview" | "split";
 
 const colorChoices = ["#eed9b6", "#cfe5e7", "#f4d8d8", "#dceac8", "#efe0ff"];
 const thumbnailAutoSyncIntervalMs = 60 * 1000;
+const editorPreferenceKeys = {
+  bodyViewMode: "knowledge-canvas:editor:body-view-mode",
+  detailWidth: "knowledge-canvas:editor:detail-width",
+  paletteWidth: "knowledge-canvas:editor:palette-width",
+} as const;
 const nodeTypes: NodeTypes = {
   knowledgeCard: CardNode,
 };
@@ -71,6 +76,15 @@ function normalizeTag(value: string) {
 
 function normalizeTags(values: string[]) {
   return Array.from(new Set(values.map(normalizeTag).filter(Boolean)));
+}
+
+function parseTagInput(value: string) {
+  return normalizeTags(
+    value
+      .replace(/[、，;\n]/g, ",")
+      .split(",")
+      .map((item) => item.trim().replace(/^#/, "")),
+  );
 }
 
 function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
@@ -265,6 +279,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const bodyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const copiedCardIdsRef = useRef<string[]>([]);
+  const hasLoadedInitialDocumentRef = useRef(false);
   const lastThumbnailSyncedAtRef = useRef(0);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<
     KnowledgeCardNode,
@@ -308,8 +323,11 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const redo = useCanvasEditorStore((state) => state.redo);
 
   useEffect(() => {
-    loadDocument(initialDocument);
-  }, [initialDocument, loadDocument]);
+    if (!hasLoadedInitialDocumentRef.current || document?.canvas.id !== initialDocument.canvas.id) {
+      loadDocument(initialDocument);
+      hasLoadedInitialDocumentRef.current = true;
+    }
+  }, [document?.canvas.id, initialDocument, loadDocument]);
 
   const availableTags = useMemo(
     () =>
@@ -448,6 +466,59 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     setBodyDraft(selectedCard?.body ?? "");
     setTagInputDraft("");
   }, [selectedCard?.body, selectedCard?.title]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const storedPaletteWidth = Number.parseInt(
+      window.localStorage.getItem(editorPreferenceKeys.paletteWidth) ?? "",
+      10,
+    );
+    const storedDetailWidth = Number.parseInt(
+      window.localStorage.getItem(editorPreferenceKeys.detailWidth) ?? "",
+      10,
+    );
+    const storedBodyViewMode = window.localStorage.getItem(
+      editorPreferenceKeys.bodyViewMode,
+    ) as BodyViewMode | null;
+
+    if (Number.isFinite(storedPaletteWidth)) {
+      setPaletteWidth(Math.min(320, Math.max(180, storedPaletteWidth)));
+    }
+    if (Number.isFinite(storedDetailWidth)) {
+      setDetailWidth(Math.min(520, Math.max(280, storedDetailWidth)));
+    }
+    if (
+      storedBodyViewMode === "edit" ||
+      storedBodyViewMode === "split" ||
+      storedBodyViewMode === "preview"
+    ) {
+      setBodyViewMode(storedBodyViewMode);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    window.localStorage.setItem(editorPreferenceKeys.paletteWidth, String(paletteWidth));
+  }, [paletteWidth]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    window.localStorage.setItem(editorPreferenceKeys.detailWidth, String(detailWidth));
+  }, [detailWidth]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    window.localStorage.setItem(editorPreferenceKeys.bodyViewMode, bodyViewMode);
+  }, [bodyViewMode]);
 
   useEffect(() => {
     if (activeFilterTag && !availableTags.includes(activeFilterTag)) {
@@ -865,16 +936,18 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     if (!selectedCard || selectedCard.isLocked) {
       return;
     }
-    const normalized = normalizeTag(rawValue);
-    if (!normalized) {
+    const nextTags = parseTagInput(rawValue);
+    if (nextTags.length === 0) {
       setTagInputDraft("");
       return;
     }
-    if (selectedCard.tagNames.includes(normalized)) {
+
+    const mergedTags = normalizeTags([...selectedCard.tagNames, ...nextTags]);
+    if (mergedTags.join(",") === selectedCard.tagNames.join(",")) {
       setTagInputDraft("");
       return;
     }
-    commitCardTags([...selectedCard.tagNames, normalized]);
+    commitCardTags(mergedTags);
     setTagInputDraft("");
   }
 
@@ -995,8 +1068,12 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   }
 
   function handleSelectionChange(ids: string[]) {
-    setSelectedCardIds(ids);
-    if (ids.length <= 1) {
+    const nextSelectedIds = Array.from(new Set(ids));
+    if (nextSelectedIds.length === 0 && selectedCardIds.length > 0) {
+      return;
+    }
+    setSelectedCardIds(nextSelectedIds);
+    if (nextSelectedIds.length <= 1) {
       setInteractionMessage(null);
     }
   }
@@ -1189,7 +1266,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               onClick={() => setIsBodyExpanded((current) => !current)}
               type="button"
             >
-              {expanded ? "閉じる" : "大きく表示"}
+              {expanded ? "ページ表示を閉じる" : "ページで開く"}
             </button>
           </div>
         </div>
@@ -1246,12 +1323,17 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         >
           {bodyViewMode !== "preview" ? (
             <label className="field">
-              <span>Markdown 編集</span>
+              <span>{expanded ? "Markdown ページ編集" : "Markdown 編集"}</span>
               <textarea
                 className={expanded ? "textarea textarea--page" : "textarea textarea--markdown"}
                 disabled={!canEditBody}
                 onBlur={(event) => commitCardBody(event.target.value)}
                 onChange={(event) => setBodyDraft(event.target.value)}
+                placeholder={
+                  expanded
+                    ? "# 見出し\n\n- 要点\n- TODO\n\n> 気づき\n\n```text\nメモ\n```"
+                    : "Markdown で本文を書けます"
+                }
                 ref={bodyTextareaRef}
                 value={bodyDraft}
               />
@@ -1260,7 +1342,13 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           {bodyViewMode !== "edit" ? (
             <div className="detail-markdown__preview">
               <span>プレビュー</span>
-              <div className="markdown-surface">{renderMarkdownDocument(bodyDraft)}</div>
+              <div
+                className={
+                  expanded ? "markdown-surface markdown-surface--page" : "markdown-surface"
+                }
+              >
+                {renderMarkdownDocument(bodyDraft)}
+              </div>
             </div>
           ) : null}
         </div>
@@ -1591,7 +1679,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               <section className="detail-tags">
                 <div className="detail-tags__header">
                   <h3>タグ</h3>
-                  <p className="muted">Enter / Tab / カンマで追加できます。</p>
+                  <p className="muted">Enter / Tab / カンマ区切りで複数追加できます。</p>
                 </div>
                 <div className="detail-tags__list">
                   {selectedCard.tagNames.map((tag) => (
@@ -1615,7 +1703,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                   onBlur={() => handleAddTag(tagInputDraft)}
                   onChange={(event) => setTagInputDraft(event.target.value)}
                   onKeyDown={handleTagInputKeyDown}
-                  placeholder="タグを追加"
+                  placeholder="例: 設計, backend, 要確認"
                   value={tagInputDraft}
                 />
                 <div className="tag-chip-list">
