@@ -573,3 +573,17 @@
   Playwright では editor 破損の回帰までは見られるが、ドラッグの滑らかさ自体は自動計測していない。必要なら drag 操作を含む manual QA か、将来的にパフォーマンス計測を追加する必要がある。
 - 次のアクション:
   このドラッグ経路の見直しをコミットして push し、ユーザ環境で体感が改善したかを確認する。改善が足りなければ次はカードノード再描画数の削減や detail panel 側 state の分離を進める。
+
+## 2026-04-22 11:16
+- 変更内容:
+  document 保存処理が autosave と手動保存で並行実行されると、backend 側の `delete -> insert` 保存と衝突して `cards_pkey` の重複 500 が出る経路を確認した。frontend では保存中フラグと pending save mode を ref で持ち、保存要求を直列化した。manual save は auto save より優先し、保存完了後に保留中の最新要求だけを再実行する。あわせて、カードドラッグ中は autosave と document 由来 node 同期を抑止し、`onNodesChange` では `position` / `dimensions` / `select` だけを local node state に反映するようにして、ドラッグ中にカードが消える症状を避けた。確認は最新 build を使った `next start` on `3004` と Playwright smoke test で pass した。
+- 目的:
+  ドラッグ操作中にカードが消え、保存 API が 500 になる不具合を、frontend 側の保存競合と React Flow 同期競合の両面から止めるため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`progress.md`
+- 未解決事項:
+  backend の `save_canvas_document` 自体は依然として `delete -> insert` 方式のため、将来的には DB トランザクションや upsert ベースへ寄せた方が安全。現時点では frontend 側で直列化して衝突を避けている。
+- 次のアクション:
+  この保存直列化とドラッグ安定化をコミットして push し、ユーザ環境で 500 とカード消失が再発しないかを確認する。必要なら次は backend 保存処理のトランザクション化も検討する。

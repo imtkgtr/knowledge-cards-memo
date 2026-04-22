@@ -280,7 +280,11 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const copiedCardIdsRef = useRef<string[]>([]);
   const hasLoadedInitialDocumentRef = useRef(false);
   const hasFittedViewRef = useRef(false);
+  const isDraggingNodeRef = useRef(false);
   const lastThumbnailSyncedAtRef = useRef(0);
+  const latestDocumentRef = useRef<CanvasDocument | null>(initialDocument);
+  const pendingSaveModeRef = useRef<"auto" | "manual" | null>(null);
+  const saveInFlightRef = useRef(false);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<
     KnowledgeCardNode,
     Edge
@@ -328,6 +332,10 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       hasLoadedInitialDocumentRef.current = true;
     }
   }, [document?.canvas.id, initialDocument, loadDocument]);
+
+  useEffect(() => {
+    latestDocumentRef.current = document;
+  }, [document]);
 
   const availableTags = useMemo(
     () =>
@@ -457,6 +465,9 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   }, [selectedCard?.body, selectedCard?.title]);
 
   useEffect(() => {
+    if (isDraggingNodeRef.current) {
+      return;
+    }
     setFlowNodes((currentNodes) => {
       const currentNodeById = new Map(currentNodes.map((node) => [node.id, node]));
       const nextNodes = nodesFromDocument.map((node) => {
@@ -756,7 +767,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   ]);
 
   useEffect(() => {
-    if (!document || !isDirty || saveState === "saving") {
+    if (!document || !isDirty || saveState === "saving" || isDraggingNodeRef.current) {
       return;
     }
     const timeoutId = window.setTimeout(() => {
@@ -848,39 +859,100 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     }
   }
 
-  async function handleSave(isAutoSave = false) {
-    if (!document) {
+  const flushQueuedSave = useEffectEvent(async () => {
+    if (!pendingSaveModeRef.current) {
       return;
     }
+
+    const nextMode = pendingSaveModeRef.current;
+    pendingSaveModeRef.current = null;
+    await handleSave(nextMode === "auto");
+  });
+
+  async function runSave(documentToSave: CanvasDocument, isAutoSave: boolean) {
     if (!isAutoSave) {
       setSaveMessage(null);
     }
+    saveInFlightRef.current = true;
     setSaveState("saving");
     const {
       data: { session },
     } = await supabase.auth.getSession();
 
     if (!session?.access_token) {
+      saveInFlightRef.current = false;
       setSaveState("error", "セッションが切れています。再ログインしてください。");
       return;
     }
 
-    startTransition(async () => {
-      try {
-        const saved = await clientSaveCanvasDocument(
-          session.access_token,
-          document.canvas.id,
-          document,
-        );
-        markSaved(saved.canvas.updatedAt);
-        void syncCanvasThumbnail(session.access_token, isAutoSave);
-        if (!isAutoSave) {
-          setSaveMessage("保存しました。");
+    await new Promise<void>((resolve) => {
+      startTransition(async () => {
+        try {
+          const saved = await clientSaveCanvasDocument(
+            session.access_token,
+            documentToSave.canvas.id,
+            documentToSave,
+          );
+          markSaved(saved.canvas.updatedAt);
+          void syncCanvasThumbnail(session.access_token, isAutoSave);
+          if (!isAutoSave) {
+            setSaveMessage("保存しました。");
+          }
+        } catch (error) {
+          setSaveState("error", error instanceof Error ? error.message : "保存に失敗しました。");
+        } finally {
+          saveInFlightRef.current = false;
+          resolve();
         }
-      } catch (error) {
-        setSaveState("error", error instanceof Error ? error.message : "保存に失敗しました。");
-      }
+      });
     });
+
+    await flushQueuedSave();
+  }
+
+  async function handleSave(isAutoSave = false) {
+    const documentToSave = latestDocumentRef.current;
+    if (!documentToSave) {
+      return;
+    }
+    const requestedMode = isAutoSave ? "auto" : "manual";
+    if (saveInFlightRef.current) {
+      pendingSaveModeRef.current =
+        pendingSaveModeRef.current === "manual" || requestedMode === "manual" ? "manual" : "auto";
+      return;
+    }
+    await runSave(documentToSave, isAutoSave);
+  }
+
+  function handleNodesChange(changes: NodeChange<KnowledgeCardNode>[]) {
+    const relevantChanges = changes.filter(
+      (change) =>
+        change.type === "position" || change.type === "dimensions" || change.type === "select",
+    );
+    if (relevantChanges.length === 0) {
+      return;
+    }
+    setFlowNodes((currentNodes) => applyNodeChanges(relevantChanges, currentNodes));
+  }
+
+  function handleNodeDragStart() {
+    isDraggingNodeRef.current = true;
+  }
+
+  function handleNodeDragStop(nodeId: string, x: number, y: number) {
+    isDraggingNodeRef.current = false;
+    moveCard(nodeId, x, y);
+    setFlowNodes((currentNodes) =>
+      currentNodes.map((node) =>
+        node.id === nodeId
+          ? {
+              ...node,
+              dragging: false,
+              position: { x, y },
+            }
+          : node,
+      ),
+    );
   }
 
   function handleAddTag(rawValue: string) {
@@ -1029,10 +1101,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     });
     setSearchQuery("");
     setInteractionMessage(`「${card.title}」の位置へ移動しました。`);
-  }
-
-  function handleNodesChange(changes: NodeChange<KnowledgeCardNode>[]) {
-    setFlowNodes((currentNodes) => applyNodeChanges(changes, currentNodes));
   }
 
   function handleAutoLayout() {
@@ -1498,8 +1566,11 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             }}
             onConnect={handleConnect}
             onNodeClick={(_, node) => handleNodeClick(node.id)}
+            onNodeDragStart={() => handleNodeDragStart()}
             onNodesChange={handleNodesChange}
-            onNodeDragStop={(_, node) => moveCard(node.id, node.position.x, node.position.y)}
+            onNodeDragStop={(_, node) =>
+              handleNodeDragStop(node.id, node.position.x, node.position.y)
+            }
             onPaneClick={() => {
               selectCard(null);
               setActiveMode("idle");
