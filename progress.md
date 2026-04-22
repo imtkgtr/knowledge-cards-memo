@@ -545,3 +545,17 @@
   現在の smoke test は複数選択やリンク追加までは見ていない。editor の詳細回帰は今後シナリオを増やしていく必要がある。
 - 次のアクション:
   今回の E2E 基盤と editor 安定化をコミットし、次はリンク追加やパネルリサイズも Playwright シナリオへ広げる。
+
+## 2026-04-22 10:44
+- 変更内容:
+  editor の `fitView` prop を外し、初回だけ `reactFlowInstance.fitView()` を呼ぶ方式へ変更した。あわせてカード座標のローカル UI state を追加し、`onNodeDrag` 中はその座標で即時描画し、`onNodeDragStop` で store へ確定するようにした。これにより、ドラッグ中の見た目を滑らかに戻した。本文欄の下には live Markdown プレビューを復活させ、`- ` や見出しが即時に整形表示されるようにした。Playwright smoke test には本文入力と Markdown プレビュー確認も追加し、production mode の frontend (`next start` on `3002`) に対してログイン、キャンバス作成、editor 表示、カード追加、Markdown プレビューまで pass した。
+- 目的:
+  実ブラウザで残っていた `Maximum update depth exceeded` を `fitView` 起点で解消し、同時にドラッグ体験と Markdown 表示要求も満たすため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/app/globals.css`、`frontend/tests/e2e/canvas-editor-smoke.spec.ts`、`progress.md`
+- 未解決事項:
+  Markdown は live preview 方式であり、Notion のように本文欄そのものが WYSIWYG になるわけではない。複数選択やリンク追加の E2E はまだ未追加。
+- 次のアクション:
+  この修正をコミットし、次はリンク追加とパネルリサイズも Playwright シナリオへ広げる。

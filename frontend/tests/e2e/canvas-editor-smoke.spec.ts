@@ -46,6 +46,7 @@ test("ログインしてキャンバス作成とカード追加まで進める",
   const password = `Pass-${suffix}-Z9!`;
   const canvasName = `E2E Canvas ${suffix}`;
   const cardTitle = `E2E Card ${suffix}`;
+  const markdownBody = ["# 見出し", "", "- 箇条書き1", "- 箇条書き2"].join("\n");
   const pageErrors: string[] = [];
 
   page.on("pageerror", (error) => {
@@ -81,6 +82,11 @@ test("ログインしてキャンバス作成とカード追加まで進める",
 
   await expect(page.getByText(cardTitle).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "カード詳細" })).toBeVisible();
+  await page.getByLabel("本文編集").fill(markdownBody);
+
+  const preview = page.locator(".detail-markdown__preview");
+  await expect(preview.getByText("見出し")).toBeVisible();
+  await expect(preview.locator("li")).toHaveCount(2);
 
   expect(pageErrors, pageErrors.join("\n")).toEqual([]);
 });

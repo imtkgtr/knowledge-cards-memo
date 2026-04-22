@@ -271,11 +271,15 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [isThumbnailPending, setIsThumbnailPending] = useState(false);
   const [tagInputDraft, setTagInputDraft] = useState("");
   const [titleDraft, setTitleDraft] = useState("");
+  const [uiNodePositions, setUiNodePositions] = useState<Record<string, { x: number; y: number }>>(
+    {},
+  );
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const bodyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const copiedCardIdsRef = useRef<string[]>([]);
   const hasLoadedInitialDocumentRef = useRef(false);
+  const hasFittedViewRef = useRef(false);
   const lastThumbnailSyncedAtRef = useRef(0);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<
     KnowledgeCardNode,
@@ -352,7 +356,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       visibleCards.map((card) => ({
         id: card.id,
         type: "knowledgeCard",
-        position: { x: card.x, y: card.y },
+        position: uiNodePositions[card.id] ?? { x: card.x, y: card.y },
         draggable: !card.isLocked,
         selectable: true,
         data: {
@@ -365,7 +369,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           tagSummary: card.tagNames.slice(0, 2).join(", "),
         },
       })),
-    [activeHighlightTag, visibleCards],
+    [activeHighlightTag, uiNodePositions, visibleCards],
   );
 
   const edgesFromDocument = useMemo<Edge[]>(
@@ -452,6 +456,13 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   }, [selectedCard?.body, selectedCard?.title]);
 
   useEffect(() => {
+    const nextPositions = Object.fromEntries(
+      (document?.cards ?? []).map((card) => [card.id, { x: card.x, y: card.y }]),
+    );
+    setUiNodePositions(nextPositions);
+  }, [document?.cards]);
+
+  useEffect(() => {
     if (activeFilterTag && !availableTags.includes(activeFilterTag)) {
       setActiveFilterTag(null);
     }
@@ -480,6 +491,26 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     setSelectedCardIds,
     visibleCardIds,
   ]);
+
+  useEffect(() => {
+    if (!reactFlowInstance || !document) {
+      return;
+    }
+    if (hasFittedViewRef.current) {
+      return;
+    }
+    if (document.cards.length === 0) {
+      return;
+    }
+
+    hasFittedViewRef.current = true;
+    window.requestAnimationFrame(() => {
+      reactFlowInstance.fitView({
+        duration: 200,
+        padding: 0.16,
+      });
+    });
+  }, [document, reactFlowInstance]);
 
   const commitCanvasName = useEffectEvent((value: string) => {
     const currentName = document?.canvas.name ?? "";
@@ -951,16 +982,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     );
   }
 
-  function handleSelectionChange(ids: string[]) {
-    const nextSelectedIds = Array.from(new Set(ids)).sort((left, right) =>
-      left.localeCompare(right),
-    );
-    setSelectedCardIds(nextSelectedIds);
-    if (nextSelectedIds.length <= 1) {
-      setInteractionMessage(null);
-    }
-  }
-
   function handleSearchResultClick(cardId: string) {
     const card = document?.cards.find((item) => item.id === cardId);
     if (!card || !reactFlowInstance) {
@@ -1158,6 +1179,14 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               value={bodyDraft}
             />
           </label>
+          <div className="detail-markdown__preview">
+            <span>Markdown プレビュー</span>
+            <div
+              className={expanded ? "markdown-surface markdown-surface--page" : "markdown-surface"}
+            >
+              {renderMarkdownDocument(bodyDraft)}
+            </div>
+          </div>
         </div>
       </section>
     );
@@ -1416,7 +1445,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         <div className="editor-canvas" ref={canvasContainerRef}>
           <ReactFlow<KnowledgeCardNode, Edge>
             edges={edgesFromDocument}
-            fitView
             multiSelectionKeyCode={["Meta", "Control", "Shift"]}
             nodeTypes={nodeTypes}
             nodes={nodesFromDocument}
@@ -1430,6 +1458,12 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             }}
             onConnect={handleConnect}
             onNodeClick={(_, node) => handleNodeClick(node.id)}
+            onNodeDrag={(_, node) => {
+              setUiNodePositions((current) => ({
+                ...current,
+                [node.id]: { x: node.position.x, y: node.position.y },
+              }));
+            }}
             onNodeDragStop={(_, node) => moveCard(node.id, node.position.x, node.position.y)}
             onPaneClick={() => {
               selectCard(null);
