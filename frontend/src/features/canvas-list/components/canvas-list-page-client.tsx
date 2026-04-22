@@ -6,6 +6,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
+import { CanvasDeleteModal } from "./canvas-delete-modal";
 import { CanvasNameModal } from "./canvas-name-modal";
 
 type CanvasListPageClientProps = {
@@ -14,7 +15,11 @@ type CanvasListPageClientProps = {
   userEmail: string | undefined;
 };
 
-type ModalState = { mode: "create" } | { mode: "rename"; canvas: CanvasSummary } | null;
+type ModalState =
+  | { mode: "create" }
+  | { mode: "rename"; canvas: CanvasSummary }
+  | { mode: "delete"; canvas: CanvasSummary }
+  | null;
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("ja-JP", {
@@ -110,6 +115,10 @@ export function CanvasListPageClient({
     setModalState({ mode: "rename", canvas });
   }
 
+  function openDeleteModal(canvas: CanvasSummary) {
+    setModalState({ mode: "delete", canvas });
+  }
+
   function closeModal() {
     setModalState(null);
   }
@@ -163,10 +172,6 @@ export function CanvasListPageClient({
   }
 
   function handleDelete(canvas: CanvasSummary) {
-    if (!window.confirm(`「${canvas.name}」を削除します。`)) {
-      return;
-    }
-
     setError(null);
     setSuccessMessage(null);
     startTransition(async () => {
@@ -175,6 +180,7 @@ export function CanvasListPageClient({
           method: "DELETE",
         });
         setCanvases((current) => current.filter((item) => item.id !== canvas.id));
+        closeModal();
       } catch (requestError) {
         setError(requestError instanceof Error ? requestError.message : "削除に失敗しました。");
       }
@@ -336,7 +342,7 @@ export function CanvasListPageClient({
                   </button>
                   <button
                     className="button button--ghost"
-                    onClick={() => handleDelete(canvas)}
+                    onClick={() => openDeleteModal(canvas)}
                     type="button"
                   >
                     削除
@@ -353,8 +359,13 @@ export function CanvasListPageClient({
         initialValue={modalState?.mode === "rename" ? modalState.canvas.name : ""}
         onCancel={closeModal}
         onConfirm={handleCreateOrRename}
-        open={modalState !== null}
+        open={modalState?.mode === "create" || modalState?.mode === "rename"}
         title={modalState?.mode === "create" ? "キャンバスを作成" : "キャンバス名を変更"}
+      />
+      <CanvasDeleteModal
+        canvas={modalState?.mode === "delete" ? modalState.canvas : null}
+        onCancel={closeModal}
+        onConfirm={handleDelete}
       />
     </main>
   );

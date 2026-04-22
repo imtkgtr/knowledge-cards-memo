@@ -686,6 +686,20 @@
 - 次のアクション:
   必要になった段階で、競合比較表や差別化メッセージの形に展開する。
 
+## 2026-04-22 16:27
+- 変更内容:
+  一覧画面のキャンバス削除を `window.confirm` から専用モーダルへ置き換えた。削除対象のキャンバス名を明示しつつ、一覧の create / rename と同じモーダル系 UI で確認できるようにした。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
+- 目的:
+  仕様書にある delete confirm を一覧画面にも反映し、ブラウザ標準ダイアログ依存を減らして UI を統一するため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-list/components/canvas-list-page-client.tsx`、`frontend/src/features/canvas-list/components/canvas-delete-modal.tsx`、`progress.md`
+- 未解決事項:
+  import confirm まではまだモーダル化しておらず、現時点では import error の表示のみ既存の notice を使っている。
+- 次のアクション:
+  この一覧削除モーダル対応をコミットして push し、その後は import confirm や auth 遷移の切り分けへ進む。
+
 ## 2026-04-22 16:18
 - 変更内容:
   editor 上部の検索で title / body を照合する際に、`NFKC` 正規化、空白圧縮、小文字化を入れた。これにより、全角半角や余分な空白を含む検索語でも一致しやすくなった。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
