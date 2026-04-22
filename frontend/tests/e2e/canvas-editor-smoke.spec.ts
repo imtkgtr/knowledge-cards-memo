@@ -47,6 +47,7 @@ test("ログインしてキャンバス作成とカード追加まで進める",
   const canvasName = `E2E Canvas ${suffix}`;
   const cardTitle = `E2E Card ${suffix}`;
   const tagName = `tag-${suffix}`;
+  const paintColor = "#cfe5e7";
   const markdownBody = ["# 見出し", "", "- 箇条書き1", "- 箇条書き2"].join("\n");
   const pageErrors: string[] = [];
 
@@ -91,9 +92,14 @@ test("ログインしてキャンバス作成とカード追加まで進める",
   const preview = page.locator(".detail-markdown__preview");
   await expect(preview.getByText("見出し")).toBeVisible();
   await expect(preview.locator("li")).toHaveCount(2);
+  await expect(page.locator(".react-flow__node", { hasText: "箇条書き1" })).toHaveCount(1);
 
   const canvasNode = page.locator(".react-flow__node", { hasText: cardTitle });
   await expect(canvasNode).toHaveCount(1);
+
+  await page.getByRole("button", { name: `色モード ${paintColor}` }).click();
+  await canvasNode.click();
+  await expect(page.getByLabel(`カード色 ${paintColor}`)).toHaveClass(/color-chip--active/);
 
   await page.getByRole("button", { name: "ロックモード" }).click();
   await canvasNode.click();
@@ -104,6 +110,8 @@ test("ログインしてキャンバス作成とカード追加まで進める",
   await page.getByPlaceholder("例: 設計, backend").fill(tagName);
   await page.getByPlaceholder("例: 設計, backend").press("Enter");
   await expect(page.getByRole("button", { name: `#${tagName}` }).first()).toBeVisible();
+
+  await expect(page.getByRole("button", { name: /ファイルを添付/ })).toBeVisible();
 
   await page.getByRole("button", { name: "削除モード" }).click();
   await canvasNode.click();

@@ -169,6 +169,50 @@ function parseTagInput(value: string) {
   );
 }
 
+function extractAutoCardTitles(markdown: string) {
+  const titles = markdown
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .flatMap((line) => {
+      if (!line) {
+        return [];
+      }
+
+      const checklistMatch = line.match(/^[-*]\s+\[[ xX]\]\s+(.+)$/);
+      if (checklistMatch) {
+        return [checklistMatch[1]];
+      }
+
+      const bulletMatch = line.match(/^[-*]\s+(.+)$/);
+      if (bulletMatch) {
+        return [bulletMatch[1]];
+      }
+
+      const orderedMatch = line.match(/^\d+\.\s+(.+)$/);
+      if (orderedMatch) {
+        return [orderedMatch[1]];
+      }
+
+      const headingMatch = line.match(/^#{2,3}\s+(.+)$/);
+      if (headingMatch) {
+        return [headingMatch[1]];
+      }
+
+      return [];
+    })
+    .map((item) =>
+      item
+        .replace(/[*_`#]+/g, "")
+        .replace(/\[(.*?)\]\(.*?\)/g, "$1")
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
+    .filter(Boolean);
+
+  return Array.from(new Set(titles));
+}
+
 function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
   return text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g).map((part, index) => {
     const key = `${keyPrefix}-${index}`;
@@ -351,6 +395,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [isDetailHidden, setIsDetailHidden] = useState(false);
   const [isPaletteHidden, setIsPaletteHidden] = useState(false);
   const [paletteWidth, setPaletteWidth] = useState(240);
+  const [paintColor, setPaintColor] = useState<string | null>(null);
   const [detailWidth, setDetailWidth] = useState(360);
   const [pendingLinkSourceId, setPendingLinkSourceId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -358,7 +403,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [isThumbnailPending, setIsThumbnailPending] = useState(false);
   const [tagInputDraft, setTagInputDraft] = useState("");
   const [titleDraft, setTitleDraft] = useState("");
-  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const bodyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const copiedCardIdsRef = useRef<string[]>([]);
@@ -389,6 +433,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const selectCard = useCanvasEditorStore((state) => state.selectCard);
   const setSelectedCardIds = useCanvasEditorStore((state) => state.setSelectedCardIds);
   const createCard = useCanvasEditorStore((state) => state.createCard);
+  const createCardsFromBody = useCanvasEditorStore((state) => state.createCardsFromBody);
   const updateCard = useCanvasEditorStore((state) => state.updateCard);
   const moveCard = useCanvasEditorStore((state) => state.moveCard);
   const addHierarchyLink = useCanvasEditorStore((state) => state.addHierarchyLink);
@@ -897,6 +942,27 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     setInteractionMessage(`${selectedCardIds.length} 件のカードを削除しました。`);
   }
 
+  function togglePaintColorMode(color: string) {
+    setNextCardColor(color);
+
+    if (selectedCardIds.length > 1) {
+      bulkSetColor(selectedCardIds, color);
+      setInteractionMessage(`${selectedCardIds.length} 件のカード色を変更しました。`);
+    }
+
+    if (activeMode === "paintColor" && paintColor === color) {
+      setActiveMode("idle");
+      setPaintColor(null);
+      setInteractionMessage(null);
+      return;
+    }
+
+    setPaintColor(color);
+    setPendingLinkSourceId(null);
+    setActiveMode("paintColor");
+    setInteractionMessage("色モードです。カードをクリックすると色を適用します。");
+  }
+
   function handleHighlightTagClick(tag: string | null) {
     setActiveHighlightTag((current) => {
       const nextTag = current === tag ? null : tag;
@@ -1110,11 +1176,13 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     if (activeMode === mode) {
       setActiveMode("idle");
       setPendingLinkSourceId(null);
+      setPaintColor(null);
       setInteractionMessage(null);
       return;
     }
 
     setActiveMode(mode);
+    setPaintColor(null);
     const nextSourceId =
       pendingLinkSourceId ?? (selectedCardIds.length === 1 ? selectedCardId : null);
     setPendingLinkSourceId(nextSourceId);
@@ -1134,6 +1202,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
 
     setActiveMode(mode);
     setPendingLinkSourceId(null);
+    setPaintColor(null);
     setInteractionMessage(
       mode === "deleteCard"
         ? "削除モードです。カードをクリックすると削除します。"
@@ -1159,6 +1228,21 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       }
       bulkDeleteCards([nodeId]);
       setInteractionMessage(`「${targetCard.title}」を削除しました。`);
+      return;
+    }
+
+    if (activeMode === "paintColor") {
+      const targetCard = document?.cards.find((card) => card.id === nodeId);
+      if (!targetCard || !paintColor) {
+        return;
+      }
+      if (targetCard.isLocked) {
+        setInteractionMessage("ロック中のカードには色を適用できません。");
+        return;
+      }
+      updateCard(nodeId, { color: paintColor });
+      selectCard(nodeId);
+      setInteractionMessage(`「${targetCard.title}」に色を適用しました。`);
       return;
     }
 
@@ -1281,6 +1365,28 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     );
   }
 
+  function syncCardsFromBody(markdown: string) {
+    if (!selectedCard) {
+      return;
+    }
+    const titles = extractAutoCardTitles(markdown);
+    if (titles.length === 0) {
+      return;
+    }
+    const createdCount = createCardsFromBody(selectedCard.id, titles);
+    if (createdCount > 0) {
+      setInteractionMessage(`本文から ${createdCount} 件のカードを追加しました。`);
+    }
+  }
+
+  function handleBodyEditComplete(value: string) {
+    if (selectedCard && value === selectedCard.body) {
+      return;
+    }
+    commitCardBody(value);
+    syncCardsFromBody(value);
+  }
+
   function startPanelResize(target: "palette" | "detail", clientX: number) {
     const startX = clientX;
     const startWidth = target === "palette" ? paletteWidth : detailWidth;
@@ -1342,6 +1448,10 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     event.target.value = "";
     if (!file || !document || !selectedCard) {
       return;
+    }
+
+    if (isDirty) {
+      await handleSave();
     }
 
     const accessToken = await getAccessToken();
@@ -1423,6 +1533,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         <div className="detail-markdown__header">
           <div>
             <h3>本文</h3>
+            <p className="muted detail-markdown__note">箇条書きや見出しは子カードへ反映します。</p>
           </div>
           <div className="detail-markdown__actions">
             <button
@@ -1441,7 +1552,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               <textarea
                 className="textarea textarea--page"
                 disabled={!canEditBody}
-                onBlur={(event) => commitCardBody(event.target.value)}
+                onBlur={(event) => handleBodyEditComplete(event.target.value)}
                 onChange={(event) => setBodyDraft(event.target.value)}
                 placeholder="ここに本文を書いてください。必要なら Markdown 記法もそのまま使えます。"
                 ref={bodyTextareaRef}
@@ -1704,6 +1815,24 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                   >
                     <ToolGlyph kind="branch" />
                   </button>
+                  <div className="editor-palette__floatingColors">
+                    {colorChoices.map((color) => (
+                      <button
+                        aria-label={`色モード ${color}`}
+                        className={
+                          activeMode === "paintColor" && paintColor === color
+                            ? "color-chip color-chip--active color-chip--painting"
+                            : nextCardColor === color
+                              ? "color-chip color-chip--active"
+                              : "color-chip"
+                        }
+                        key={color}
+                        onClick={() => togglePaintColorMode(color)}
+                        style={{ backgroundColor: color }}
+                        type="button"
+                      />
+                    ))}
+                  </div>
                   <button
                     aria-label="ロックモード"
                     className={
@@ -1731,24 +1860,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                     <ToolGlyph kind="delete" />
                   </button>
                 </div>
-                <div className="editor-palette__floatingColors">
-                  {colorChoices.map((color) => (
-                    <button
-                      aria-label={`色 ${color}`}
-                      className={
-                        nextCardColor === color ? "color-chip color-chip--active" : "color-chip"
-                      }
-                      key={color}
-                      onClick={() =>
-                        selectedCardIds.length > 1
-                          ? bulkSetColor(selectedCardIds, color)
-                          : setNextCardColor(color)
-                      }
-                      style={{ backgroundColor: color }}
-                      type="button"
-                    />
-                  ))}
-                </div>
               </div>
               {activeMode === "addHierarchyLink" ? (
                 <p className="muted editor-palette__hint">
@@ -1763,6 +1874,9 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               ) : null}
               {activeMode === "deleteCard" ? (
                 <p className="muted editor-palette__hint">削除モード: カードをクリック</p>
+              ) : null}
+              {activeMode === "paintColor" && paintColor ? (
+                <p className="muted editor-palette__hint">色モード: カードをクリック</p>
               ) : null}
               <button
                 aria-label="ツールを隠す"
@@ -1815,6 +1929,10 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                 setInteractionMessage(
                   "リンクモードを維持しています。接続先カードを選択してください。",
                 );
+                return;
+              }
+              if (activeMode === "paintColor") {
+                setInteractionMessage("色モードです。カードをクリックすると色を適用します。");
                 return;
               }
               if (activeMode === "toggleCardLock") {
@@ -1967,22 +2085,17 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                 </section>
                 <section className="detail-links">
                   <h3>添付</h3>
-                  <input
-                    accept="image/png,image/jpeg,image/webp,application/pdf,text/plain,.txt"
-                    className="sr-only"
-                    disabled={selectedCard.isLocked || isAttachmentPending}
-                    onChange={handleAttachmentFileChange}
-                    ref={attachmentInputRef}
-                    type="file"
-                  />
-                  <button
-                    className="button button--ghost"
-                    disabled={selectedCard.isLocked || isAttachmentPending}
-                    onClick={() => attachmentInputRef.current?.click()}
-                    type="button"
-                  >
-                    {isAttachmentPending ? "添付中..." : "添付追加"}
-                  </button>
+                  <label className="detail-attachmentDropzone">
+                    <strong>{isAttachmentPending ? "添付中..." : "ファイルを添付"}</strong>
+                    <span>画像、PDF、TXT</span>
+                    <input
+                      accept="image/png,image/jpeg,image/webp,application/pdf,text/plain,.txt"
+                      className="detail-attachmentInput"
+                      disabled={selectedCard.isLocked || isAttachmentPending}
+                      onChange={handleAttachmentFileChange}
+                      type="file"
+                    />
+                  </label>
                   {selectedAttachments.length ? (
                     <ul>
                       {selectedAttachments.map((attachment) => (

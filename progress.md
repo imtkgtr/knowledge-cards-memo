@@ -657,3 +657,31 @@
   左ツールの形状変更は現在「幅に応じた横展開」までで、任意の自由配置や完全なレイアウト保存までは未対応。
 - 次のアクション:
   このモード化と topbar / palette 調整をコミットして push し、必要であれば次はカード見た目や一覧画面の整形へ進む。
+
+## 2026-04-22 14:02
+- 変更内容:
+  editor に `色モード` を追加し、左パレットの色チップを選んだままカードを連続クリックして色を適用できるようにした。本文では箇条書き・チェックリスト・番号付きリスト・ `##` / `###` 見出しを抽出し、編集確定時に不足している子カードを自動生成して階層リンクへ接続するようにした。UI は Notion 参考画像に寄せて、画面全体の余白と角丸を減らし、キャンバスと右パネルの占有率を上げ、左パレットを広いときは一列表示 + 右端収納矢印になるよう再設計した。添付 UI は隠し input の疑似クリックから visible file input ベースの dropzone へ変更し、添付 upload は browser から backend へ直接送る経路へ切り替えた。あわせて `NEXT_PUBLIC_API_BASE_URL` の client-side 参照を静的参照へ修正した。確認は `bun run lint`、`bun run build`、`PLAYWRIGHT_BASE_URL=http://127.0.0.1:3010 bun run test:e2e tests/e2e/canvas-editor-smoke.spec.ts`、`cd backend && uv run pytest tests/test_canvases.py -k attachment_crud_flow -q` で行った。
+- 目的:
+  本文から知識カードが自然に増えていく体験、左パレットからの連続操作、より広いワークスペース表示、添付導線の安定化をまとめて進めるため。
+- 影響範囲:
+  `frontend/`、`backend test`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/stores/use-canvas-editor-store.ts`、`frontend/src/lib/api/backend.ts`、`frontend/src/app/globals.css`、`frontend/tests/e2e/canvas-editor-smoke.spec.ts`、`progress.md`
+- 未解決事項:
+  添付は backend CRUD test では通っているが、Playwright から native file picker を完全再現する確認までは入れていない。現時点の smoke では upload surface の表示確認までに留めている。
+- 次のアクション:
+  この editor 強化をコミットして push し、必要であれば次は添付の browser 実機確認を追加するか、本文からのカード生成ルールをさらに細かく調整する。
+
+## 2026-04-22 14:09
+- 変更内容:
+  類似ツールの現状把握のため、Heptabase、Obsidian Canvas、Milanote、Capacities、Napkin AI を公式サイト・公式ヘルプベースで調査し、知識カードキャンバスとの近さ、差別化候補、次に見るべき論点を `docs/research/knowledge_canvas_reference_tools_research.md` に整理した。
+- 目的:
+  今後の UI / AI / export 方針を、既存ツールとの差分を意識しながら判断できるようにするため。
+- 影響範囲:
+  `docs/`、`progress.md`
+- 関連ファイル:
+  `docs/research/knowledge_canvas_reference_tools_research.md`、`progress.md`
+- 未解決事項:
+  類似ツールの価格、コラボ制限、API 範囲などの詳細比較まではまだ表にしていない。
+- 次のアクション:
+  必要になった段階で、競合比較表や差別化メッセージの形に展開する。

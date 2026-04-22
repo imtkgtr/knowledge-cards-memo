@@ -1,9 +1,9 @@
 :root {
   color-scheme: light;
-  --bg: #f5f1e7;
-  --surface: rgba(255, 255, 255, 0.86);
-  --surface-strong: rgba(255, 255, 255, 0.96);
-  --line: rgba(50, 34, 10, 0.12);
+  --bg: #f3f2ee;
+  --surface: rgba(255, 255, 255, 0.92);
+  --surface-strong: rgba(255, 255, 255, 0.98);
+  --line: rgba(50, 34, 10, 0.1);
   --text: #1f1a13;
   --muted: #6b6256;
   --accent: #145c62;
@@ -12,7 +12,7 @@
   --danger-soft: #fbe3df;
   --success: #21643a;
   --success-soft: #ddf5e4;
-  --shadow: 0 24px 60px rgba(68, 48, 13, 0.12);
+  --shadow: 0 18px 40px rgba(68, 48, 13, 0.08);
 }
 
 * {
@@ -29,9 +29,7 @@ body {
 body {
   font-family: "Hiragino Sans", "Noto Sans JP", sans-serif;
   color: var(--text);
-  background: radial-gradient(circle at top left, #fff7d6 0, transparent 28%),
-    radial-gradient(circle at bottom right, #dff6f1 0, transparent 24%),
-    linear-gradient(180deg, #f8f5ec 0%, var(--bg) 100%);
+  background: linear-gradient(180deg, #f7f6f3 0%, var(--bg) 100%);
 }
 
 a {
@@ -201,9 +199,9 @@ select {
 
 .editor-shell {
   min-height: 100vh;
-  padding: 20px;
+  padding: 12px;
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .editor-topbar {
@@ -211,9 +209,9 @@ select {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 20px 22px;
+  padding: 16px 18px;
   border: 1px solid var(--line);
-  border-radius: 24px;
+  border-radius: 14px;
   background: var(--surface);
   box-shadow: var(--shadow);
 }
@@ -228,12 +226,12 @@ select {
 .editor-topbar__title {
   width: min(100%, 460px);
   min-width: 0;
-  margin-bottom: 8px;
+  margin: 0;
   padding: 0;
   border: none;
   background: transparent;
   color: var(--text);
-  font-size: clamp(2rem, 3vw, 2.8rem);
+  font-size: clamp(1.8rem, 2.6vw, 2.4rem);
   font-weight: 700;
 }
 
@@ -325,10 +323,10 @@ select {
 }
 
 .editor-layout {
-  min-height: calc(100vh - 200px);
+  min-height: calc(100vh - 120px);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 10px;
 }
 
 .selection-toolbar {
@@ -336,7 +334,7 @@ select {
   gap: 12px;
   padding: 16px 18px;
   border: 1px solid var(--line);
-  border-radius: 24px;
+  border-radius: 14px;
   background: var(--surface);
   box-shadow: var(--shadow);
 }
@@ -360,7 +358,7 @@ select {
   align-content: start;
   gap: 12px;
   padding: 12px 12px 10px;
-  border-radius: 22px;
+  border-radius: 14px;
 }
 
 .editor-palette__hint {
@@ -385,13 +383,17 @@ select {
 }
 
 .editor-palette--wide {
-  border-radius: 28px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-radius: 14px;
 }
 
 .editor-palette--wide .editor-palette__floatingMain {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+  flex: 1 1 auto;
 }
 
 .editor-palette__floatingActions {
@@ -411,6 +413,11 @@ select {
 
 .editor-palette--wide .editor-palette__floatingColors {
   justify-content: flex-start;
+}
+
+.editor-palette--wide .editor-palette__hint {
+  margin: 0;
+  white-space: nowrap;
 }
 
 .editor-panelToggle {
@@ -443,7 +450,7 @@ select {
   height: 44px;
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.82);
   color: var(--text);
   cursor: pointer;
@@ -483,7 +490,6 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  justify-self: end;
   width: 44px;
   height: 30px;
   padding: 0;
@@ -495,8 +501,8 @@ select {
 }
 
 .editor-palette--wide .editor-palette__collapse {
-  justify-self: auto;
-  align-self: center;
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .tag-chip-list {
@@ -543,21 +549,25 @@ select {
   border-color: var(--text);
 }
 
+.color-chip--painting {
+  box-shadow: 0 0 0 3px rgba(20, 92, 98, 0.12);
+}
+
 .editor-canvas {
   position: relative;
-  min-height: 640px;
+  min-height: calc(100vh - 140px);
   border: 1px solid var(--line);
-  border-radius: 24px;
+  border-radius: 12px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.86);
   box-shadow: var(--shadow);
 }
 
 .editor-detail {
-  padding: 18px 18px 18px 22px;
+  padding: 16px 16px 16px 18px;
   overflow: visible;
   min-width: 0;
-  border-radius: 24px;
+  border-radius: 12px;
   cursor: ew-resize;
 }
 
@@ -630,6 +640,11 @@ select {
   font-size: 1rem;
 }
 
+.detail-markdown__note {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
 .detail-markdown__actions {
   display: flex;
   flex-wrap: wrap;
@@ -679,7 +694,7 @@ select {
   min-height: 180px;
   padding: 16px 18px;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.92);
   overflow: auto;
 }
@@ -787,7 +802,7 @@ select {
   gap: 12px;
   padding: 10px 12px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.72);
   min-width: 0;
 }
@@ -810,9 +825,40 @@ select {
 .detail-attachment__preview {
   width: min(100%, 220px);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 10px;
   background: #f7f0df;
   object-fit: cover;
+}
+
+.detail-attachmentDropzone {
+  position: relative;
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px dashed rgba(20, 92, 98, 0.26);
+  border-radius: 12px;
+  background: rgba(20, 92, 98, 0.04);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.detail-attachmentDropzone span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.detail-attachmentInput {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.detail-attachmentInput:disabled {
+  cursor: not-allowed;
 }
 
 .textarea {
@@ -820,7 +866,7 @@ select {
   min-height: 180px;
   padding: 12px 14px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.9);
   resize: vertical;
   font: inherit;
@@ -829,7 +875,7 @@ select {
 .textarea--page {
   min-height: 72vh;
   padding: 22px 24px;
-  border-radius: 22px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.96);
   font-family: inherit;
   font-size: 1rem;
@@ -842,9 +888,9 @@ select {
   max-width: calc(240px + var(--card-node-child-weight) * 8px);
   padding: calc(14px + var(--card-node-child-weight) * 1px);
   border: 1px solid rgba(31, 26, 19, 0.15);
-  border-radius: 18px;
-  box-shadow: 0 calc(10px + var(--card-node-child-weight) * 2px)
-    calc(24px + var(--card-node-child-weight) * 2px) rgba(41, 29, 10, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 calc(8px + var(--card-node-child-weight) * 2px)
+    calc(18px + var(--card-node-child-weight) * 2px) rgba(41, 29, 10, 0.08);
 }
 
 .card-node__handle {

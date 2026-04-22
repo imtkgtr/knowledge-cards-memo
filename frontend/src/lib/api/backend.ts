@@ -2,20 +2,28 @@ import type { Attachment, CanvasDocument, CanvasExportPayload, CanvasSummary } f
 
 const browserProxyBasePath = "/api/backend";
 
-function getRequiredValue(name: "BACKEND_INTERNAL_URL" | "NEXT_PUBLIC_API_BASE_URL") {
-  const value = process.env[name];
+function getRequiredInternalUrl() {
+  const value = process.env.BACKEND_INTERNAL_URL;
   if (!value) {
-    throw new Error(`${name} is not configured.`);
+    throw new Error("BACKEND_INTERNAL_URL is not configured.");
+  }
+  return value;
+}
+
+function getRequiredPublicUrl() {
+  const value = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (!value) {
+    throw new Error("NEXT_PUBLIC_API_BASE_URL is not configured.");
   }
   return value;
 }
 
 export function getBackendInternalUrl() {
-  return getRequiredValue("BACKEND_INTERNAL_URL");
+  return getRequiredInternalUrl();
 }
 
 export function getBackendPublicUrl() {
-  return getRequiredValue("NEXT_PUBLIC_API_BASE_URL");
+  return getRequiredPublicUrl();
 }
 
 export function getBrowserProxyPath(path: string) {
@@ -142,7 +150,7 @@ export async function clientUploadAttachment(
   formData.set("cardId", cardId);
   formData.set("file", file);
 
-  const response = await fetch(getBrowserProxyPath(`/canvases/${canvasId}/attachments`), {
+  const response = await fetch(`${getBackendPublicUrl()}/api/canvases/${canvasId}/attachments`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
