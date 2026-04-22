@@ -686,6 +686,20 @@
 - 次のアクション:
   必要になった段階で、競合比較表や差別化メッセージの形に展開する。
 
+## 2026-04-22 16:18
+- 変更内容:
+  editor 上部の検索で title / body を照合する際に、`NFKC` 正規化、空白圧縮、小文字化を入れた。これにより、全角半角や余分な空白を含む検索語でも一致しやすくなった。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
+- 目的:
+  技術仕様書で未解決事項になっていた「検索の日本語正規化」を初版として改善し、基本的な表記ゆれに強くするため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`progress.md`
+- 未解決事項:
+  かな変換や同義語展開までは行っておらず、初版は `NFKC + 小文字化 + 空白圧縮` の範囲に留めている。
+- 次のアクション:
+  この検索正規化をコミットして push し、その後は auth 遷移の切り分けか、editor / 一覧まわりの残仕様を順に埋める。
+
 ## 2026-04-22 16:06
 - 変更内容:
   カード作成後に右パネルを開いたまま本文のページ編集モーダルを自動表示し、そのまま本文入力へ入れるようにした。これに合わせて smoke test へ「新規カード作成直後に本文ページ編集が開く」観点を追加した。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。

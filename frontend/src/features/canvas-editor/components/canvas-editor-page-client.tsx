@@ -160,6 +160,10 @@ function normalizeTag(value: string) {
   return value.trim().replace(/\s+/g, "-").toLowerCase();
 }
 
+function normalizeSearchText(value: string) {
+  return value.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 function normalizeTags(values: string[]) {
   return Array.from(new Set(values.map(normalizeTag).filter(Boolean)));
 }
@@ -554,14 +558,14 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const isPaletteWide = paletteWidth >= 320;
   const canDeleteSelection = selectedCardIds.length > 0 && !lockedSelected;
   const searchResults = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const query = normalizeSearchText(searchQuery);
     if (!query) {
       return [];
     }
     return [...(document?.cards ?? [])]
       .filter((card) => {
-        const title = card.title.toLowerCase();
-        const body = card.body.toLowerCase();
+        const title = normalizeSearchText(card.title);
+        const body = normalizeSearchText(card.body);
         return title.includes(query) || body.includes(query);
       })
       .sort(
