@@ -686,6 +686,20 @@
 - 次のアクション:
   必要になった段階で、競合比較表や差別化メッセージの形に展開する。
 
+## 2026-04-22 16:35
+- 変更内容:
+  一覧画面の JSON import を即時実行から確認モーダル付きに変更した。JSON を選んだらキャンバス名、カード数、リンク数を表示してから取り込みを確定するようにし、添付が含まれないことも明示した。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
+- 目的:
+  仕様書にある import confirm を一覧画面へ反映し、誤った JSON を即座に流し込むリスクを減らすため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-list/components/canvas-list-page-client.tsx`、`frontend/src/features/canvas-list/components/canvas-import-modal.tsx`、`progress.md`
+- 未解決事項:
+  import error は notice 表示で扱っているが、専用の error modal まではまだ作っていない。
+- 次のアクション:
+  この import confirm 対応をコミットして push し、その後は auth 遷移の切り分けや一覧画面の文言密度調整へ進む。
+
 ## 2026-04-22 16:27
 - 変更内容:
   一覧画面のキャンバス削除を `window.confirm` から専用モーダルへ置き換えた。削除対象のキャンバス名を明示しつつ、一覧の create / rename と同じモーダル系 UI で確認できるようにした。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。

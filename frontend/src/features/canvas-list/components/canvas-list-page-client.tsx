@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { CanvasDeleteModal } from "./canvas-delete-modal";
+import { CanvasImportModal } from "./canvas-import-modal";
 import { CanvasNameModal } from "./canvas-name-modal";
 
 type CanvasListPageClientProps = {
@@ -58,6 +59,9 @@ export function CanvasListPageClient({
   const [error, setError] = useState<string | null>(initialError);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [modalState, setModalState] = useState<ModalState>(null);
+  const [pendingImportPayload, setPendingImportPayload] = useState<CanvasExportPayload | null>(
+    null,
+  );
   const [isPending, startTransition] = useTransition();
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -121,6 +125,10 @@ export function CanvasListPageClient({
 
   function closeModal() {
     setModalState(null);
+  }
+
+  function closeImportModal() {
+    setPendingImportPayload(null);
   }
 
   function handleCreateOrRename(value: string) {
@@ -236,6 +244,23 @@ export function CanvasListPageClient({
 
     setError(null);
     setSuccessMessage(null);
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text) as unknown;
+      if (!isCanvasImportPayload(payload)) {
+        throw new Error("JSON の形式が不正です。");
+      }
+      setPendingImportPayload(payload);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : "JSON のインポートに失敗しました。",
+      );
+    }
+  }
+
+  function handleImportConfirm(payload: CanvasExportPayload) {
+    setError(null);
+    setSuccessMessage(null);
     startTransition(async () => {
       try {
         const accessToken = await getAccessToken();
@@ -244,13 +269,9 @@ export function CanvasListPageClient({
           router.refresh();
           return;
         }
-        const text = await file.text();
-        const payload = JSON.parse(text) as unknown;
-        if (!isCanvasImportPayload(payload)) {
-          throw new Error("JSON の形式が不正です。");
-        }
         const imported = await clientImportCanvas(accessToken, payload);
         setCanvases((current) => [imported, ...current]);
+        setPendingImportPayload(null);
         setSuccessMessage("JSON を新規キャンバスとして取り込みました。");
       } catch (requestError) {
         setError(
@@ -366,6 +387,11 @@ export function CanvasListPageClient({
         canvas={modalState?.mode === "delete" ? modalState.canvas : null}
         onCancel={closeModal}
         onConfirm={handleDelete}
+      />
+      <CanvasImportModal
+        onCancel={closeImportModal}
+        onConfirm={handleImportConfirm}
+        payload={pendingImportPayload}
       />
     </main>
   );
