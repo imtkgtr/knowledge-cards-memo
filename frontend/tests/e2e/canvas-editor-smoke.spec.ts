@@ -86,6 +86,8 @@ test("ログインしてキャンバス作成とカード追加まで進める",
   await page.getByRole("button", { name: "作成する" }).click();
 
   await expect(page.getByText(cardTitle).first()).toBeVisible();
+  await expect(page.getByLabel("本文ページ編集")).toBeVisible();
+  await page.getByRole("button", { name: "閉じる" }).click();
   await page.getByRole("button", { name: "カードを追加" }).first().click();
   await page.getByLabel("タイトル").fill(cardTitle);
   await page.getByRole("button", { name: "作成する" }).click();

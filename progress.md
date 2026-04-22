@@ -686,6 +686,20 @@
 - 次のアクション:
   必要になった段階で、競合比較表や差別化メッセージの形に展開する。
 
+## 2026-04-22 16:06
+- 変更内容:
+  カード作成後に右パネルを開いたまま本文のページ編集モーダルを自動表示し、そのまま本文入力へ入れるようにした。これに合わせて smoke test へ「新規カード作成直後に本文ページ編集が開く」観点を追加した。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
+- 目的:
+  仕様書にある「カード作成後は右パネルを開き、最初に本文へ入る」導線を満たし、カード作成直後の入力フローを短くするため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/tests/e2e/canvas-editor-smoke.spec.ts`、`progress.md`
+- 未解決事項:
+  smoke test 自体は本文導線の観点を入れたが、ローカルでは依然として login 直後の `/canvases` 遷移で既存 auth 問題に当たるため、最後までは流せていない。
+- 次のアクション:
+  この本文導線改善をコミットして push し、その後は auth 遷移の切り分けか、残っている editor 周辺の細かな仕様差分の解消へ進む。
+
 ## 2026-04-22 15:48
 - 変更内容:
   右パネル本文のページモーダルに `編集 / 分割 / プレビュー` の 3 モードを追加し、仕様どおり本文を単独編集・左右分割・閲覧専用で切り替えられるようにした。通常状態では従来どおりプレビューを維持しつつ、クリックでモーダルへ入り、分割モードでは textarea と Markdown プレビューを並べて確認できる。あわせて smoke test に本文モード切替の観点を追記した。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。

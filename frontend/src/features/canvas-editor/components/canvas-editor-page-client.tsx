@@ -965,6 +965,11 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     setCreateModalInitialTitle("");
     setIsCreateModalOpen(false);
     setPendingDuplicateTitle(null);
+    if (createdCardId) {
+      setIsDetailHidden(false);
+      setBodyViewMode("edit");
+      setIsBodyExpanded(true);
+    }
     if (activeFilterTag) {
       setActiveFilterTag(null);
       setInteractionMessage("カードを追加しました。絞り込みは解除しています。");
