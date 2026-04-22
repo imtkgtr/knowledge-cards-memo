@@ -49,6 +49,8 @@ type CanvasEditorPageClientProps = {
   initialDocument: CanvasDocument;
 };
 
+type BodyViewMode = "edit" | "preview" | "split";
+
 const colorChoices = ["#eed9b6", "#cfe5e7", "#f4d8d8", "#dceac8", "#efe0ff"];
 const panelResizeHitArea = 14;
 const thumbnailAutoSyncIntervalMs = 60 * 1000;
@@ -400,6 +402,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<string, string>>({});
   const [isBodyExpanded, setIsBodyExpanded] = useState(false);
+  const [bodyViewMode, setBodyViewMode] = useState<BodyViewMode>("edit");
   const [isDetailHidden, setIsDetailHidden] = useState(false);
   const [isPaletteHidden, setIsPaletteHidden] = useState(false);
   const [paletteWidth, setPaletteWidth] = useState(240);
@@ -916,6 +919,12 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     });
     return () => window.cancelAnimationFrame(animationFrameId);
   }, [bodyDraft.length, isBodyExpanded]);
+
+  useEffect(() => {
+    if (!isBodyExpanded) {
+      setBodyViewMode("edit");
+    }
+  }, [isBodyExpanded]);
 
   function handleCreateCard(title: string) {
     const nextTitle = title.trim();
@@ -1611,6 +1620,8 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
 
   function renderBodySection(expanded = false) {
     const canEditBody = Boolean(selectedCard && !selectedCard.isLocked);
+    const shouldShowEditor = expanded && bodyViewMode !== "preview";
+    const shouldShowPreview = !expanded || bodyViewMode !== "edit";
 
     return (
       <section
@@ -1622,19 +1633,67 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             <p className="muted detail-markdown__note">箇条書きや見出しは子カードへ反映します。</p>
           </div>
           <div className="detail-markdown__actions">
-            <button
-              className="button button--ghost"
-              onClick={() => setIsBodyExpanded((current) => !current)}
-              type="button"
-            >
-              {expanded ? "閉じる" : "編集"}
-            </button>
+            {expanded ? (
+              <>
+                <button
+                  className={
+                    bodyViewMode === "edit" ? "button button--accent" : "button button--ghost"
+                  }
+                  onClick={() => setBodyViewMode("edit")}
+                  type="button"
+                >
+                  編集
+                </button>
+                <button
+                  className={
+                    bodyViewMode === "split" ? "button button--accent" : "button button--ghost"
+                  }
+                  onClick={() => setBodyViewMode("split")}
+                  type="button"
+                >
+                  分割
+                </button>
+                <button
+                  className={
+                    bodyViewMode === "preview" ? "button button--accent" : "button button--ghost"
+                  }
+                  onClick={() => setBodyViewMode("preview")}
+                  type="button"
+                >
+                  プレビュー
+                </button>
+                <button
+                  className="button button--ghost"
+                  onClick={() => setIsBodyExpanded(false)}
+                  type="button"
+                >
+                  閉じる
+                </button>
+              </>
+            ) : (
+              <button
+                className="button button--ghost"
+                onClick={() => {
+                  setBodyViewMode("edit");
+                  setIsBodyExpanded(true);
+                }}
+                type="button"
+              >
+                編集
+              </button>
+            )}
           </div>
         </div>
-        <div className="detail-markdown__workspace">
-          {expanded ? (
+        <div
+          className={
+            expanded && bodyViewMode === "split"
+              ? "detail-markdown__workspace detail-markdown__workspace--split"
+              : "detail-markdown__workspace"
+          }
+        >
+          {shouldShowEditor ? (
             <label className="field">
-              <span>本文ページ編集</span>
+              <span>{bodyViewMode === "split" ? "本文を編集" : "本文ページ編集"}</span>
               <textarea
                 className="textarea textarea--page"
                 disabled={!canEditBody}
@@ -1645,19 +1704,29 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                 value={bodyDraft}
               />
             </label>
-          ) : (
+          ) : null}
+          {shouldShowPreview ? (
             <button
               className="detail-markdown__previewButton"
               disabled={!canEditBody}
-              onClick={() => setIsBodyExpanded(true)}
+              onClick={() => {
+                setBodyViewMode("edit");
+                setIsBodyExpanded(true);
+              }}
               type="button"
             >
               <div className="detail-markdown__preview">
-                <span>Markdown プレビュー</span>
-                <div className="markdown-surface">{renderMarkdownDocument(bodyDraft)}</div>
+                <span>{expanded ? "本文プレビュー" : "Markdown プレビュー"}</span>
+                <div
+                  className={
+                    expanded ? "markdown-surface markdown-surface--page" : "markdown-surface"
+                  }
+                >
+                  {renderMarkdownDocument(bodyDraft)}
+                </div>
               </div>
             </button>
-          )}
+          ) : null}
         </div>
       </section>
     );

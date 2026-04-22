@@ -102,6 +102,13 @@ test("ログインしてキャンバス作成とカード追加まで進める",
   await expect(page.getByRole("heading", { name: "カード" })).toBeVisible();
   await page.getByRole("button", { name: "編集" }).click();
   await expect(page.getByLabel("本文ページ編集")).toBeVisible();
+  await page.getByRole("button", { name: "分割" }).click();
+  await expect(page.getByText("本文プレビュー")).toBeVisible();
+  await expect(page.getByText("本文を編集")).toBeVisible();
+  await page.getByRole("button", { name: "プレビュー" }).click();
+  await expect(page.getByText("本文ページ編集")).toHaveCount(0);
+  await page.getByRole("button", { name: "編集" }).click();
+  await expect(page.getByLabel("本文ページ編集")).toBeVisible();
   await page.getByLabel("本文ページ編集").fill(markdownBody);
   await page.getByRole("button", { name: "閉じる" }).click();
 

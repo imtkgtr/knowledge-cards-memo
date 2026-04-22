@@ -686,6 +686,20 @@
 - 次のアクション:
   必要になった段階で、競合比較表や差別化メッセージの形に展開する。
 
+## 2026-04-22 15:48
+- 変更内容:
+  右パネル本文のページモーダルに `編集 / 分割 / プレビュー` の 3 モードを追加し、仕様どおり本文を単独編集・左右分割・閲覧専用で切り替えられるようにした。通常状態では従来どおりプレビューを維持しつつ、クリックでモーダルへ入り、分割モードでは textarea と Markdown プレビューを並べて確認できる。あわせて smoke test に本文モード切替の観点を追記した。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
+- 目的:
+  仕様書で未実装だった本文 `分割` モードを埋め、Markdown を書きながら結果も見たいユースケースに対応するため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/app/globals.css`、`frontend/tests/e2e/canvas-editor-smoke.spec.ts`、`progress.md`
+- 未解決事項:
+  smoke test は本文モード切替の観点を入れたが、ローカルでは依然として login 直後の `/canvases` 遷移で既存 auth 問題に当たるため最後までは流せていない。
+- 次のアクション:
+  この本文モード対応をコミットして push し、その後は auth 遷移の不安定化を切り分けるか、editor 周辺の未解決 UI を順次詰める。
+
 ## 2026-04-22 15:32
 - 変更内容:
   editor のカード作成フローに同名カード警告モーダルを追加し、既存タイトルと重複する場合は確認を挟んでから作成するようにした。モーダルには `今後はこのキャンバスで表示しない` を追加し、canvas の `duplicateWarningSuppressed` へ保存されるよう store を拡張した。あわせて、作成モーダルの入力を警告から戻っても保持できるようにし、Playwright smoke test に同名警告と suppress 動作の確認を追加した。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
