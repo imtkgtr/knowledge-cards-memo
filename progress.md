@@ -685,3 +685,17 @@
   類似ツールの価格、コラボ制限、API 範囲などの詳細比較まではまだ表にしていない。
 - 次のアクション:
   必要になった段階で、競合比較表や差別化メッセージの形に展開する。
+
+## 2026-04-22 14:28
+- 変更内容:
+  仕様書と現在の実装を棚卸しし、editor 画面に残っていた取りこぼしを追加した。topbar には `書き出し` を追加し、一覧画面と同じ JSON export を editor から直接実行できるようにした。複数選択バーには `選択を基準に整列` を追加し、選択中カードの先頭を anchor にして全体整列できるようにした。確認は `bun run lint`、`bun run build`、`PLAYWRIGHT_BASE_URL=http://127.0.0.1:3010 bun run test:e2e tests/e2e/canvas-editor-smoke.spec.ts` で行った。
+- 目的:
+  仕様との対応を見直したうえで、実用上不足していた editor 内の export 導線と selection toolbar の整列導線を埋めるため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`progress.md`
+- 未解決事項:
+  仕様書にある `同名カード警告モーダル` と本文 `分割` モードはまだ未実装で、現状は `progress.md` 上の残タスクとして扱うのが妥当。
+- 次のアクション:
+  この棚卸し対応をコミットして push し、次は duplicate warning と本文 edit mode の拡張を検討する。

@@ -18,6 +18,7 @@ import "@xyflow/react/dist/style.css";
 import {
   clientClearCanvasThumbnail,
   clientDeleteAttachment,
+  clientExportCanvas,
   clientGetAttachmentAccessUrl,
   clientSaveCanvasDocument,
   clientUploadAttachment,
@@ -158,6 +159,10 @@ function normalizeTag(value: string) {
 
 function normalizeTags(values: string[]) {
   return Array.from(new Set(values.map(normalizeTag).filter(Boolean)));
+}
+
+function sanitizeFileName(value: string) {
+  return value.trim().replace(/[\\/:*?"<>|]+/g, "-") || "knowledge-canvas";
 }
 
 function parseTagInput(value: string) {
@@ -1365,6 +1370,47 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     );
   }
 
+  function handleSelectionAutoLayout() {
+    if (!document || selectedCardIds.length === 0) {
+      return;
+    }
+
+    const positions = buildDagreLayout(document, {
+      anchorCardId: selectedCardIds[0],
+    });
+    const changed = applyCardLayout(positions);
+    setInteractionMessage(
+      changed
+        ? "選択中カードを基準に全体整列しました。"
+        : "整列対象のカード位置に変更はありませんでした。",
+    );
+  }
+
+  async function handleExport() {
+    const accessToken = await getAccessToken();
+    if (!accessToken || !document) {
+      setInteractionMessage("セッションが切れています。再ログインしてください。");
+      return;
+    }
+
+    setSaveMessage(null);
+    try {
+      const payload = await clientExportCanvas(accessToken, document.canvas.id);
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = `${sanitizeFileName(canvasNameDraft || document.canvas.name)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setInteractionMessage("JSON を書き出しました。添付ファイルは含まれません。");
+    } catch (error) {
+      setInteractionMessage(
+        error instanceof Error ? error.message : "JSON の書き出しに失敗しました。",
+      );
+    }
+  }
+
   function syncCardsFromBody(markdown: string) {
     if (!selectedCard) {
       return;
@@ -1700,6 +1746,13 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               整列
             </button>
             <button
+              className="button button--ghost"
+              onClick={() => void handleExport()}
+              type="button"
+            >
+              書き出し
+            </button>
+            <button
               className={isDetailHidden ? "button button--accent" : "button button--ghost"}
               onClick={() => setIsDetailHidden((current) => !current)}
               type="button"
@@ -1737,6 +1790,14 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                 type="button"
               />
             ))}
+            <button
+              className="button button--ghost"
+              disabled={lockedSelected}
+              onClick={handleSelectionAutoLayout}
+              type="button"
+            >
+              選択を基準に整列
+            </button>
             <button
               className="button button--ghost"
               disabled={lockedSelected}
