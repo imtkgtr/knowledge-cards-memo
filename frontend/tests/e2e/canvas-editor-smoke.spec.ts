@@ -64,7 +64,10 @@ test("ログインしてキャンバス作成とカード追加まで進める",
   await page.getByLabel("パスワード").fill(password);
   await page.getByRole("button", { name: "ログインする" }).click();
 
-  await expect(page.getByRole("heading", { name: "キャンバス一覧" })).toBeVisible();
+  await page.waitForURL(/\/canvases(?:\?.*)?$/, { timeout: 15000 });
+  await expect(page.getByRole("heading", { name: "キャンバス一覧" })).toBeVisible({
+    timeout: 15000,
+  });
 
   await page.getByRole("button", { name: "新規作成" }).click();
   await expect(page.getByRole("heading", { name: "キャンバスを作成" })).toBeVisible();
@@ -83,6 +86,19 @@ test("ログインしてキャンバス作成とカード追加まで進める",
   await page.getByRole("button", { name: "作成する" }).click();
 
   await expect(page.getByText(cardTitle).first()).toBeVisible();
+  await page.getByRole("button", { name: "カードを追加" }).first().click();
+  await page.getByLabel("タイトル").fill(cardTitle);
+  await page.getByRole("button", { name: "作成する" }).click();
+  await expect(page.getByRole("heading", { name: "同じ名前のカードがあります" })).toBeVisible();
+  await page.getByLabel("今後はこのキャンバスで表示しない").check();
+  await page.getByRole("button", { name: "そのまま作成" }).click();
+  await expect(page.getByRole("heading", { name: "同じ名前のカードがあります" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "カードを追加" }).first().click();
+  await page.getByLabel("タイトル").fill(cardTitle);
+  await page.getByRole("button", { name: "作成する" }).click();
+  await expect(page.getByRole("heading", { name: "同じ名前のカードがあります" })).toHaveCount(0);
+
   await expect(page.getByRole("heading", { name: "カード" })).toBeVisible();
   await page.getByRole("button", { name: "編集" }).click();
   await expect(page.getByLabel("本文ページ編集")).toBeVisible();

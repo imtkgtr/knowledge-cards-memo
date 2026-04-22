@@ -60,6 +60,7 @@ type CanvasEditorState = {
   selectCard: (cardId: string | null) => void;
   setActiveMode: (mode: ActiveMode) => void;
   setCanvasName: (name: string) => void;
+  setDuplicateWarningSuppressed: (suppressed: boolean) => void;
   setNextCardColor: (color: string) => void;
   setSaveState: (saveState: SaveState, saveError?: string | null) => void;
   setSelectedCardIds: (cardIds: string[]) => void;
@@ -616,6 +617,15 @@ export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
           return;
         }
         draft.canvas.name = nextName;
+        draft.canvas.updatedAt = getNow();
+      });
+    },
+    setDuplicateWarningSuppressed: (suppressed) => {
+      updateDocument("同名警告設定変更", (draft) => {
+        if (draft.canvas.duplicateWarningSuppressed === suppressed) {
+          return;
+        }
+        draft.canvas.duplicateWarningSuppressed = suppressed;
         draft.canvas.updatedAt = getNow();
       });
     },

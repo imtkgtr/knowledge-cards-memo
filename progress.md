@@ -686,6 +686,20 @@
 - 次のアクション:
   必要になった段階で、競合比較表や差別化メッセージの形に展開する。
 
+## 2026-04-22 15:32
+- 変更内容:
+  editor のカード作成フローに同名カード警告モーダルを追加し、既存タイトルと重複する場合は確認を挟んでから作成するようにした。モーダルには `今後はこのキャンバスで表示しない` を追加し、canvas の `duplicateWarningSuppressed` へ保存されるよう store を拡張した。あわせて、作成モーダルの入力を警告から戻っても保持できるようにし、Playwright smoke test に同名警告と suppress 動作の確認を追加した。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
+- 目的:
+  仕様書に残っていた `同名カード警告モーダル` の取りこぼしを埋め、重複カードを意図せず増やす操作を抑止しつつ、警告を canvas 単位で抑制できるようにするため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/features/canvas-editor/components/create-card-modal.tsx`、`frontend/src/features/canvas-editor/components/duplicate-card-warning-modal.tsx`、`frontend/src/stores/use-canvas-editor-store.ts`、`frontend/src/app/globals.css`、`frontend/tests/e2e/canvas-editor-smoke.spec.ts`、`progress.md`
+- 未解決事項:
+  Playwright smoke test は今回追加した同名警告ケースまで含めて更新したが、ローカル実行ではログイン直後に `/canvases` へ遷移しない既存 auth 側の問題で開始直後に停止した。今回の変更箇所へ入る前で止まっているため、editor 機能自体の追加失敗はまだ観測していない。
+- 次のアクション:
+  この同名警告対応をコミットして push し、その後は Playwright の login 遷移不安定化を切り分けるか、本文 `分割` モードなど残仕様を順に埋める。
+
 ## 2026-04-22 15:08
 - 変更内容:
   Supabase Storage へ添付を保存する際の key 生成を見直し、日本語や空白を含むファイル名でも ASCII ベースの安全な path へ正規化して upload できるようにした。あわせて、非 ASCII ファイル名が期待どおりの storage path に変換されることを固定する backend test を追加した。

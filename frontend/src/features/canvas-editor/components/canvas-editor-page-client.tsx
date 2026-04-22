@@ -43,6 +43,7 @@ import {
 import { buildDagreLayout } from "../lib/apply-dagre-layout";
 import { CardNode, type KnowledgeCardNode } from "./card-node";
 import { CreateCardModal } from "./create-card-modal";
+import { DuplicateCardWarningModal } from "./duplicate-card-warning-modal";
 
 type CanvasEditorPageClientProps = {
   initialDocument: CanvasDocument;
@@ -392,6 +393,8 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [bodyDraft, setBodyDraft] = useState("");
   const [canvasNameDraft, setCanvasNameDraft] = useState(initialDocument.canvas.name);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createModalInitialTitle, setCreateModalInitialTitle] = useState("");
+  const [pendingDuplicateTitle, setPendingDuplicateTitle] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
@@ -453,6 +456,9 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const bulkDeleteCards = useCanvasEditorStore((state) => state.bulkDeleteCards);
   const duplicateCards = useCanvasEditorStore((state) => state.duplicateCards);
   const setCanvasName = useCanvasEditorStore((state) => state.setCanvasName);
+  const setDuplicateWarningSuppressed = useCanvasEditorStore(
+    (state) => state.setDuplicateWarningSuppressed,
+  );
   const setNextCardColor = useCanvasEditorStore((state) => state.setNextCardColor);
   const setActiveMode = useCanvasEditorStore((state) => state.setActiveMode);
   const setSaveState = useCanvasEditorStore((state) => state.setSaveState);
@@ -912,6 +918,23 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   }, [bodyDraft.length, isBodyExpanded]);
 
   function handleCreateCard(title: string) {
+    const nextTitle = title.trim();
+    if (!nextTitle) {
+      return;
+    }
+    const duplicateExists = (document?.cards ?? []).some(
+      (card) => card.title.trim().localeCompare(nextTitle, "ja", { sensitivity: "base" }) === 0,
+    );
+    if (duplicateExists && !document?.canvas.duplicateWarningSuppressed) {
+      setCreateModalInitialTitle(nextTitle);
+      setIsCreateModalOpen(false);
+      setPendingDuplicateTitle(nextTitle);
+      return;
+    }
+    createCardAtCenter(nextTitle);
+  }
+
+  function createCardAtCenter(title: string) {
     const canvasBounds = canvasContainerRef.current?.getBoundingClientRect();
     const defaultPosition = {
       x: 160 + (document?.cards.length ?? 0) * 20,
@@ -930,13 +953,30 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       x: centerPosition.x,
       y: centerPosition.y,
     });
+    setCreateModalInitialTitle("");
     setIsCreateModalOpen(false);
+    setPendingDuplicateTitle(null);
     if (activeFilterTag) {
       setActiveFilterTag(null);
       setInteractionMessage("カードを追加しました。絞り込みは解除しています。");
       return;
     }
     setInteractionMessage(createdCardId ? "カードを追加しました。" : null);
+  }
+
+  function handleConfirmDuplicateCardCreation(suppressFutureWarnings: boolean) {
+    if (suppressFutureWarnings) {
+      setDuplicateWarningSuppressed(true);
+    }
+    if (!pendingDuplicateTitle) {
+      return;
+    }
+    createCardAtCenter(pendingDuplicateTitle);
+  }
+
+  function handleCancelDuplicateCardCreation() {
+    setPendingDuplicateTitle(null);
+    setIsCreateModalOpen(true);
   }
 
   function handleDeleteSelection() {
@@ -1737,7 +1777,10 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             </button>
             <button
               className={isCreateModalOpen ? "button button--accent" : "button button--ghost"}
-              onClick={() => setIsCreateModalOpen(true)}
+              onClick={() => {
+                setCreateModalInitialTitle("");
+                setIsCreateModalOpen(true);
+              }}
               type="button"
             >
               カードを追加
@@ -1857,7 +1900,10 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                         ? "editor-toolButton editor-toolButton--active"
                         : "editor-toolButton"
                     }
-                    onClick={() => setIsCreateModalOpen(true)}
+                    onClick={() => {
+                      setCreateModalInitialTitle("");
+                      setIsCreateModalOpen(true);
+                    }}
                     title="カードを追加"
                     type="button"
                   >
@@ -2271,9 +2317,19 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       ) : null}
 
       <CreateCardModal
-        onCancel={() => setIsCreateModalOpen(false)}
+        initialTitle={createModalInitialTitle}
+        onCancel={() => {
+          setCreateModalInitialTitle("");
+          setIsCreateModalOpen(false);
+        }}
         onConfirm={handleCreateCard}
         open={isCreateModalOpen}
+      />
+      <DuplicateCardWarningModal
+        onCancel={handleCancelDuplicateCardCreation}
+        onConfirm={handleConfirmDuplicateCardCreation}
+        open={Boolean(pendingDuplicateTitle)}
+        title={pendingDuplicateTitle ?? ""}
       />
     </main>
   );

@@ -128,6 +128,18 @@ select {
   font-size: 0.95rem;
 }
 
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+}
+
+.checkbox-field input {
+  width: 16px;
+  height: 16px;
+}
+
 .input {
   width: 100%;
   min-height: 48px;

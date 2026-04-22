@@ -3,19 +3,25 @@
 import { useEffect, useState } from "react";
 
 type CreateCardModalProps = {
+  initialTitle?: string;
   open: boolean;
   onCancel: () => void;
   onConfirm: (title: string) => void;
 };
 
-export function CreateCardModal({ open, onCancel, onConfirm }: CreateCardModalProps) {
+export function CreateCardModal({
+  initialTitle = "",
+  open,
+  onCancel,
+  onConfirm,
+}: CreateCardModalProps) {
   const [title, setTitle] = useState("");
 
   useEffect(() => {
     if (open) {
-      setTitle("");
+      setTitle(initialTitle);
     }
-  }, [open]);
+  }, [initialTitle, open]);
 
   if (!open) {
     return null;
