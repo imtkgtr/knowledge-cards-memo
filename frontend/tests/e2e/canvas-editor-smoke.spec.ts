@@ -46,6 +46,7 @@ test("ログインしてキャンバス作成とカード追加まで進める",
   const password = `Pass-${suffix}-Z9!`;
   const canvasName = `E2E Canvas ${suffix}`;
   const cardTitle = `E2E Card ${suffix}`;
+  const tagName = `tag-${suffix}`;
   const markdownBody = ["# 見出し", "", "- 箇条書き1", "- 箇条書き2"].join("\n");
   const pageErrors: string[] = [];
 
@@ -90,6 +91,23 @@ test("ログインしてキャンバス作成とカード追加まで進める",
   const preview = page.locator(".detail-markdown__preview");
   await expect(preview.getByText("見出し")).toBeVisible();
   await expect(preview.locator("li")).toHaveCount(2);
+
+  const canvasNode = page.locator(".react-flow__node", { hasText: cardTitle });
+  await expect(canvasNode).toHaveCount(1);
+
+  await page.getByRole("button", { name: "ロックモード" }).click();
+  await canvasNode.click();
+  await expect(page.getByLabel("タイトル")).toBeDisabled();
+  await canvasNode.click();
+  await expect(page.getByLabel("タイトル")).toBeEnabled();
+
+  await page.getByPlaceholder("例: 設計, backend").fill(tagName);
+  await page.getByPlaceholder("例: 設計, backend").press("Enter");
+  await expect(page.getByRole("button", { name: `#${tagName}` }).first()).toBeVisible();
+
+  await page.getByRole("button", { name: "削除モード" }).click();
+  await canvasNode.click();
+  await expect(page.locator(".react-flow__node", { hasText: cardTitle })).toHaveCount(0);
 
   expect(pageErrors, pageErrors.join("\n")).toEqual([]);
 });

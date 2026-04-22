@@ -7,7 +7,12 @@ import { create } from "zustand";
 enablePatches();
 
 type SaveState = "idle" | "saving" | "saved" | "error";
-export type ActiveMode = "idle" | "addHierarchyLink" | "addRelatedLink";
+export type ActiveMode =
+  | "idle"
+  | "addHierarchyLink"
+  | "addRelatedLink"
+  | "deleteCard"
+  | "toggleCardLock";
 
 type HistoryEntry = {
   createdAt: string;

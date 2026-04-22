@@ -219,8 +219,10 @@ select {
 }
 
 .editor-topbar > div:first-child {
+  display: grid;
+  gap: 12px;
   min-width: 0;
-  flex: 1 1 auto;
+  flex: 1 1 520px;
 }
 
 .editor-topbar__title {
@@ -239,7 +241,7 @@ select {
   display: grid;
   gap: 12px;
   min-width: 0;
-  flex: 1 1 720px;
+  flex: 0 1 520px;
 }
 
 .editor-topbar__searchRow,
@@ -257,9 +259,7 @@ select {
 
 .editor-topbar__filters {
   display: flex;
-  flex: 1 1 320px;
   flex-wrap: wrap;
-  justify-content: flex-end;
   gap: 12px;
   min-width: 0;
 }
@@ -267,6 +267,7 @@ select {
 .editor-topbar__filterGroup {
   display: grid;
   gap: 8px;
+  flex: 1 1 260px;
   min-width: 0;
 }
 
@@ -278,7 +279,7 @@ select {
 
 .search-panel {
   position: relative;
-  width: min(320px, 100%);
+  width: min(360px, 100%);
   min-width: min(320px, 100%);
 }
 
@@ -383,6 +384,16 @@ select {
   gap: 10px;
 }
 
+.editor-palette--wide {
+  border-radius: 28px;
+}
+
+.editor-palette--wide .editor-palette__floatingMain {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .editor-palette__floatingActions {
   display: flex;
   align-items: center;
@@ -396,6 +407,10 @@ select {
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
+}
+
+.editor-palette--wide .editor-palette__floatingColors {
+  justify-content: flex-start;
 }
 
 .editor-panelToggle {
@@ -477,6 +492,11 @@ select {
   background: rgba(255, 255, 255, 0.92);
   color: var(--muted);
   cursor: pointer;
+}
+
+.editor-palette--wide .editor-palette__collapse {
+  justify-self: auto;
+  align-self: center;
 }
 
 .tag-chip-list {

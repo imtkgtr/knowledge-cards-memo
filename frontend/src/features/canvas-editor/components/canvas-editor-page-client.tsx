@@ -53,7 +53,7 @@ const thumbnailAutoSyncIntervalMs = 60 * 1000;
 const panelSizeLimits = {
   detailMax: 640,
   detailMin: 280,
-  paletteMax: 148,
+  paletteMax: 520,
   paletteMin: 72,
 } as const;
 const nodeTypes: NodeTypes = {
@@ -72,7 +72,8 @@ function ToolGlyph({
     | "panel"
     | "delete"
     | "chevronLeft"
-    | "chevronRight";
+    | "chevronRight"
+    | "chevronDown";
 }) {
   const common = {
     fill: "none",
@@ -134,6 +135,7 @@ function ToolGlyph({
       ) : null}
       {kind === "chevronLeft" ? <path {...common} d="M14.5 6.5L8.5 12l6 5.5" /> : null}
       {kind === "chevronRight" ? <path {...common} d="M9.5 6.5l6 5.5-6 5.5" /> : null}
+      {kind === "chevronDown" ? <path {...common} d="M6.5 9.5l5.5 6 5.5-6" /> : null}
     </svg>
   );
 }
@@ -348,7 +350,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [isBodyExpanded, setIsBodyExpanded] = useState(false);
   const [isDetailHidden, setIsDetailHidden] = useState(false);
   const [isPaletteHidden, setIsPaletteHidden] = useState(false);
-  const [paletteWidth, setPaletteWidth] = useState(76);
+  const [paletteWidth, setPaletteWidth] = useState(240);
   const [detailWidth, setDetailWidth] = useState(360);
   const [pendingLinkSourceId, setPendingLinkSourceId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -490,6 +492,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       (document?.cards ?? []).some((card) => selectedCardIds.includes(card.id) && card.isLocked),
     [document?.cards, selectedCardIds],
   );
+  const isPaletteWide = paletteWidth >= 320;
   const canDeleteSelection = selectedCardIds.length > 0 && !lockedSelected;
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -894,6 +897,26 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     setInteractionMessage(`${selectedCardIds.length} 件のカードを削除しました。`);
   }
 
+  function handleHighlightTagClick(tag: string | null) {
+    setActiveHighlightTag((current) => {
+      const nextTag = current === tag ? null : tag;
+      if (nextTag) {
+        setActiveFilterTag(null);
+      }
+      return nextTag;
+    });
+  }
+
+  function handleFilterTagClick(tag: string | null) {
+    setActiveFilterTag((current) => {
+      const nextTag = current === tag ? null : tag;
+      if (nextTag) {
+        setActiveHighlightTag(null);
+      }
+      return nextTag;
+    });
+  }
+
   async function syncCanvasThumbnail(accessToken: string, isAutoSave: boolean) {
     if (!document || isThumbnailPending) {
       return;
@@ -1102,10 +1125,55 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     );
   }
 
+  function toggleCardActionMode(mode: "deleteCard" | "toggleCardLock") {
+    if (activeMode === mode) {
+      setActiveMode("idle");
+      setInteractionMessage(null);
+      return;
+    }
+
+    setActiveMode(mode);
+    setPendingLinkSourceId(null);
+    setInteractionMessage(
+      mode === "deleteCard"
+        ? "削除モードです。カードをクリックすると削除します。"
+        : "ロックモードです。カードをクリックするとロック / 解除します。",
+    );
+  }
+
   function handleNodeClick(nodeId: string) {
     if (activeMode === "idle") {
       selectCard(nodeId);
       setInteractionMessage(null);
+      return;
+    }
+
+    if (activeMode === "deleteCard") {
+      const targetCard = document?.cards.find((card) => card.id === nodeId);
+      if (!targetCard) {
+        return;
+      }
+      if (targetCard.isLocked) {
+        setInteractionMessage("ロック中のカードは削除できません。");
+        return;
+      }
+      bulkDeleteCards([nodeId]);
+      setInteractionMessage(`「${targetCard.title}」を削除しました。`);
+      return;
+    }
+
+    if (activeMode === "toggleCardLock") {
+      const targetCard = document?.cards.find((card) => card.id === nodeId);
+      if (!targetCard) {
+        return;
+      }
+      toggleCardLock(nodeId);
+      selectCard(nodeId);
+      setInteractionMessage(
+        targetCard.isLocked
+          ? `「${targetCard.title}」のロックを解除しました。`
+          : `「${targetCard.title}」をロックしました。`,
+      );
       return;
     }
 
@@ -1155,6 +1223,10 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     }
     if (activeMode === "idle") {
       setInteractionMessage("左上でリンク種別を選んでから、カードの端子をドラッグしてください。");
+      return;
+    }
+    if (activeMode !== "addHierarchyLink" && activeMode !== "addRelatedLink") {
+      setInteractionMessage("リンクモード中のみ端子ドラッグで接続できます。");
       return;
     }
     if (connection.source === connection.target) {
@@ -1408,6 +1480,56 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           <p className="muted">
             {document?.cards.length ?? 0} cards / {saveStatusLabel}
           </p>
+          {availableTags.length > 0 ? (
+            <div className="editor-topbar__filters">
+              <div className="editor-topbar__filterGroup">
+                <span>強調</span>
+                <div className="tag-chip-list">
+                  <button
+                    className={!activeHighlightTag ? "tag-chip tag-chip--active" : "tag-chip"}
+                    onClick={() => handleHighlightTagClick(null)}
+                    type="button"
+                  >
+                    なし
+                  </button>
+                  {availableTags.map((tag) => (
+                    <button
+                      className={
+                        activeHighlightTag === tag ? "tag-chip tag-chip--active" : "tag-chip"
+                      }
+                      key={`highlight-${tag}`}
+                      onClick={() => handleHighlightTagClick(tag)}
+                      type="button"
+                    >
+                      #{tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="editor-topbar__filterGroup">
+                <span>絞り込み</span>
+                <div className="tag-chip-list">
+                  <button
+                    className={!activeFilterTag ? "tag-chip tag-chip--active" : "tag-chip"}
+                    onClick={() => handleFilterTagClick(null)}
+                    type="button"
+                  >
+                    すべて
+                  </button>
+                  {availableTags.map((tag) => (
+                    <button
+                      className={activeFilterTag === tag ? "tag-chip tag-chip--active" : "tag-chip"}
+                      key={`filter-${tag}`}
+                      onClick={() => handleFilterTagClick(tag)}
+                      type="button"
+                    >
+                      #{tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
         <div className="editor-topbar__side">
           <div className="editor-topbar__searchRow">
@@ -1438,62 +1560,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                 </div>
               ) : null}
             </div>
-            {availableTags.length > 0 ? (
-              <div className="editor-topbar__filters">
-                <div className="editor-topbar__filterGroup">
-                  <span>強調</span>
-                  <div className="tag-chip-list">
-                    <button
-                      className={!activeHighlightTag ? "tag-chip tag-chip--active" : "tag-chip"}
-                      onClick={() => setActiveHighlightTag(null)}
-                      type="button"
-                    >
-                      なし
-                    </button>
-                    {availableTags.map((tag) => (
-                      <button
-                        className={
-                          activeHighlightTag === tag ? "tag-chip tag-chip--active" : "tag-chip"
-                        }
-                        key={`highlight-${tag}`}
-                        onClick={() =>
-                          setActiveHighlightTag((current) => (current === tag ? null : tag))
-                        }
-                        type="button"
-                      >
-                        #{tag}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="editor-topbar__filterGroup">
-                  <span>絞り込み</span>
-                  <div className="tag-chip-list">
-                    <button
-                      className={!activeFilterTag ? "tag-chip tag-chip--active" : "tag-chip"}
-                      onClick={() => setActiveFilterTag(null)}
-                      type="button"
-                    >
-                      すべて
-                    </button>
-                    {availableTags.map((tag) => (
-                      <button
-                        className={
-                          activeFilterTag === tag ? "tag-chip tag-chip--active" : "tag-chip"
-                        }
-                        key={`filter-${tag}`}
-                        onClick={() =>
-                          setActiveFilterTag((current) => (current === tag ? null : tag))
-                        }
-                        type="button"
-                      >
-                        #{tag}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : null}
           </div>
           <div className="editor-topbar__actions">
             <button
@@ -1602,7 +1668,11 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         <div className="editor-canvas" ref={canvasContainerRef}>
           {!isPaletteHidden ? (
             <aside
-              className="editor-palette editor-palette--floating"
+              className={
+                isPaletteWide
+                  ? "editor-palette editor-palette--floating editor-palette--wide"
+                  : "editor-palette editor-palette--floating"
+              }
               onPointerDown={(event) => handlePanelEdgePointerDown("palette", event)}
               style={{ width: paletteWidth }}
             >
@@ -1635,21 +1705,27 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                     <ToolGlyph kind="branch" />
                   </button>
                   <button
-                    aria-label={selectedCard?.isLocked ? "ロック解除" : "ロック"}
-                    className="editor-toolButton"
-                    disabled={!selectedCardId}
-                    onClick={() => selectedCardId && toggleCardLock(selectedCardId)}
-                    title={selectedCard?.isLocked ? "ロック解除" : "ロック"}
+                    aria-label="ロックモード"
+                    className={
+                      activeMode === "toggleCardLock"
+                        ? "editor-toolButton editor-toolButton--active"
+                        : "editor-toolButton"
+                    }
+                    onClick={() => toggleCardActionMode("toggleCardLock")}
+                    title="ロックモード"
                     type="button"
                   >
-                    <ToolGlyph kind={selectedCard?.isLocked ? "unlock" : "lock"} />
+                    <ToolGlyph kind="lock" />
                   </button>
                   <button
-                    aria-label="削除"
-                    className="editor-toolButton editor-toolButton--danger"
-                    disabled={!canDeleteSelection}
-                    onClick={handleDeleteSelection}
-                    title="削除"
+                    aria-label="削除モード"
+                    className={
+                      activeMode === "deleteCard"
+                        ? "editor-toolButton editor-toolButton--active editor-toolButton--danger"
+                        : "editor-toolButton editor-toolButton--danger"
+                    }
+                    onClick={() => toggleCardActionMode("deleteCard")}
+                    title="削除モード"
                     type="button"
                   >
                     <ToolGlyph kind="delete" />
@@ -1682,6 +1758,12 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                     : "カードを選択"}
                 </p>
               ) : null}
+              {activeMode === "toggleCardLock" ? (
+                <p className="muted editor-palette__hint">ロックモード: カードをクリック</p>
+              ) : null}
+              {activeMode === "deleteCard" ? (
+                <p className="muted editor-palette__hint">削除モード: カードをクリック</p>
+              ) : null}
               <button
                 aria-label="ツールを隠す"
                 className="editor-palette__collapse"
@@ -1689,7 +1771,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                 title="ツールを隠す"
                 type="button"
               >
-                <ToolGlyph kind="chevronLeft" />
+                <ToolGlyph kind={isPaletteWide ? "chevronDown" : "chevronLeft"} />
               </button>
             </aside>
           ) : (
@@ -1700,7 +1782,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               title="ツールを表示"
               type="button"
             >
-              <ToolGlyph kind="chevronRight" />
+              <ToolGlyph kind={isPaletteWide ? "chevronDown" : "chevronRight"} />
             </button>
           )}
           <ReactFlow<KnowledgeCardNode, Edge>
@@ -1719,8 +1801,31 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             }
             onPaneClick={() => {
               selectCard(null);
-              setActiveMode("idle");
-              setInteractionMessage(null);
+              if (activeMode === "idle") {
+                setInteractionMessage(null);
+                return;
+              }
+              if (activeMode === "addHierarchyLink") {
+                setInteractionMessage(
+                  "リンクモードを維持しています。起点または接続先を選択してください。",
+                );
+                return;
+              }
+              if (activeMode === "addRelatedLink") {
+                setInteractionMessage(
+                  "リンクモードを維持しています。接続先カードを選択してください。",
+                );
+                return;
+              }
+              if (activeMode === "toggleCardLock") {
+                setInteractionMessage(
+                  "ロックモードです。カードをクリックするとロック / 解除します。",
+                );
+                return;
+              }
+              if (activeMode === "deleteCard") {
+                setInteractionMessage("削除モードです。カードをクリックすると削除します。");
+              }
             }}
             selectionKeyCode={["Meta", "Control", "Shift"]}
           >
