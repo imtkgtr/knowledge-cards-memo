@@ -31,6 +31,7 @@ import Link from "next/link";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
+  type PointerEvent as ReactPointerEvent,
   useEffect,
   useEffectEvent,
   useMemo,
@@ -47,16 +48,75 @@ type CanvasEditorPageClientProps = {
 };
 
 const colorChoices = ["#eed9b6", "#cfe5e7", "#f4d8d8", "#dceac8", "#efe0ff"];
+const panelResizeHitArea = 14;
 const thumbnailAutoSyncIntervalMs = 60 * 1000;
 const panelSizeLimits = {
-  detailMax: 360,
-  detailMin: 180,
-  paletteMax: 260,
-  paletteMin: 120,
+  detailMax: 640,
+  detailMin: 280,
+  paletteMax: 148,
+  paletteMin: 72,
 } as const;
 const nodeTypes: NodeTypes = {
   knowledgeCard: CardNode,
 };
+
+function ToolGlyph({
+  kind,
+}: {
+  kind: "add" | "branch" | "lock" | "unlock" | "close" | "panel";
+}) {
+  const common = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    strokeWidth: 1.8,
+  };
+
+  return (
+    <svg aria-hidden="true" className="editor-toolIcon" viewBox="0 0 24 24">
+      {kind === "add" ? (
+        <>
+          <path {...common} d="M12 5v14" />
+          <path {...common} d="M5 12h14" />
+        </>
+      ) : null}
+      {kind === "branch" ? (
+        <>
+          <path {...common} d="M7 6v12" />
+          <path {...common} d="M7 12h10" />
+          <circle {...common} cx="7" cy="6" r="2.5" />
+          <circle {...common} cx="17" cy="12" r="2.5" />
+          <circle {...common} cx="7" cy="18" r="2.5" />
+        </>
+      ) : null}
+      {kind === "lock" ? (
+        <>
+          <rect {...common} height="9" rx="2" width="10" x="7" y="11" />
+          <path {...common} d="M9 11V9a3 3 0 0 1 6 0v2" />
+        </>
+      ) : null}
+      {kind === "unlock" ? (
+        <>
+          <rect {...common} height="9" rx="2" width="10" x="7" y="11" />
+          <path {...common} d="M15 11V9a3 3 0 0 0-5.2-2" />
+        </>
+      ) : null}
+      {kind === "close" ? (
+        <>
+          <path {...common} d="M6 6l12 12" />
+          <path {...common} d="M18 6L6 18" />
+        </>
+      ) : null}
+      {kind === "panel" ? (
+        <>
+          <rect {...common} height="14" rx="2" width="16" x="4" y="5" />
+          <path {...common} d="M10 5v14" />
+        </>
+      ) : null}
+    </svg>
+  );
+}
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("ja-JP", {
@@ -266,8 +326,10 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<string, string>>({});
   const [isBodyExpanded, setIsBodyExpanded] = useState(false);
-  const [paletteWidth, setPaletteWidth] = useState(196);
-  const [detailWidth, setDetailWidth] = useState(288);
+  const [isDetailHidden, setIsDetailHidden] = useState(false);
+  const [isPaletteHidden, setIsPaletteHidden] = useState(false);
+  const [paletteWidth, setPaletteWidth] = useState(76);
+  const [detailWidth, setDetailWidth] = useState(360);
   const [pendingLinkSourceId, setPendingLinkSourceId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isAttachmentPending, setIsAttachmentPending] = useState(false);
@@ -312,7 +374,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const appendAttachment = useCanvasEditorStore((state) => state.appendAttachment);
   const applyCardLayout = useCanvasEditorStore((state) => state.applyCardLayout);
   const removeHierarchyLink = useCanvasEditorStore((state) => state.removeHierarchyLink);
-  const removeRelatedLink = useCanvasEditorStore((state) => state.removeRelatedLink);
   const removeAttachment = useCanvasEditorStore((state) => state.removeAttachment);
   const toggleCardLock = useCanvasEditorStore((state) => state.toggleCardLock);
   const bulkSetColor = useCanvasEditorStore((state) => state.bulkSetColor);
@@ -382,8 +443,8 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [flowNodes, setFlowNodes] = useNodesState<KnowledgeCardNode>(nodesFromDocument);
 
   const edgesFromDocument = useMemo<Edge[]>(
-    () => [
-      ...((document?.hierarchyLinks ?? [])
+    () =>
+      (document?.hierarchyLinks ?? [])
         .filter(
           (link) => visibleCardIds.has(link.parentCardId) && visibleCardIds.has(link.childCardId),
         )
@@ -395,19 +456,8 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           markerEnd: { type: MarkerType.ArrowClosed },
           style: { strokeWidth: 2 },
           data: { kind: "hierarchy" },
-        })) satisfies Edge[]),
-      ...((document?.relatedLinks ?? [])
-        .filter((link) => visibleCardIds.has(link.cardAId) && visibleCardIds.has(link.cardBId))
-        .map((link) => ({
-          id: link.id,
-          source: link.cardAId,
-          target: link.cardBId,
-          type: "smoothstep",
-          style: { strokeDasharray: "6 4", strokeWidth: 2 },
-          data: { kind: "related" },
-        })) satisfies Edge[]),
-    ],
-    [document?.hierarchyLinks, document?.relatedLinks, visibleCardIds],
+        })) satisfies Edge[],
+    [document?.hierarchyLinks, visibleCardIds],
   );
 
   const selectedCard = useMemo(
@@ -1162,16 +1212,21 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     window.addEventListener("pointerup", handlePointerUp);
   }
 
-  function nudgePanelWidth(target: "palette" | "detail", delta: number) {
-    if (target === "palette") {
-      setPaletteWidth((current) =>
-        Math.min(panelSizeLimits.paletteMax, Math.max(panelSizeLimits.paletteMin, current + delta)),
-      );
+  function handlePanelEdgePointerDown(
+    target: "palette" | "detail",
+    event: ReactPointerEvent<HTMLElement>,
+  ) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const isResizeHit =
+      target === "palette"
+        ? bounds.right - event.clientX <= panelResizeHitArea
+        : event.clientX - bounds.left <= panelResizeHitArea;
+    if (!isResizeHit) {
       return;
     }
-    setDetailWidth((current) =>
-      Math.min(panelSizeLimits.detailMax, Math.max(panelSizeLimits.detailMin, current + delta)),
-    );
+    event.preventDefault();
+    event.stopPropagation();
+    startPanelResize(target, event.clientX);
   }
 
   async function getAccessToken() {
@@ -1267,7 +1322,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         <div className="detail-markdown__header">
           <div>
             <h3>本文</h3>
-            <p className="muted">{expanded ? "Markdown で入力" : "クリックで編集"}</p>
           </div>
           <div className="detail-markdown__actions">
             <button
@@ -1275,7 +1329,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               onClick={() => setIsBodyExpanded((current) => !current)}
               type="button"
             >
-              {expanded ? "編集を閉じる" : "ページで編集"}
+              {expanded ? "閉じる" : "編集"}
             </button>
           </div>
         </div>
@@ -1361,7 +1415,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             Redo
           </button>
           <button
-            className="button button--accent"
+            className={isCreateModalOpen ? "button button--accent" : "button button--ghost"}
             onClick={() => setIsCreateModalOpen(true)}
             type="button"
           >
@@ -1369,6 +1423,13 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           </button>
           <button className="button button--ghost" onClick={handleAutoLayout} type="button">
             整列
+          </button>
+          <button
+            className={isDetailHidden ? "button button--accent" : "button button--ghost"}
+            onClick={() => setIsDetailHidden((current) => !current)}
+            type="button"
+          >
+            {isDetailHidden ? "詳細を表示" : "詳細を隠す"}
           </button>
           <button
             className="button button--accent"
@@ -1431,84 +1492,10 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       {saveError ? <p className="notice notice--error">{saveError}</p> : null}
       {interactionMessage ? <p className="notice notice--success">{interactionMessage}</p> : null}
 
-      <section
-        className="editor-layout"
-        style={{
-          gridTemplateColumns: `${paletteWidth}px minmax(0, 1fr) ${detailWidth}px`,
-        }}
-      >
-        <aside className="editor-palette">
-          <button
-            className="button button--accent"
-            onClick={() => setIsCreateModalOpen(true)}
-            type="button"
-          >
-            カードを追加
-          </button>
-          <div className="editor-palette__section">
-            <p className="editor-sectionLabel">リンク</p>
-            <div className="editor-palette__stack">
-              <button
-                className={
-                  activeMode === "addHierarchyLink"
-                    ? "button button--accent"
-                    : "button button--ghost"
-                }
-                onClick={() => toggleMode("addHierarchyLink")}
-                type="button"
-              >
-                階層リンク
-              </button>
-              <button
-                className={
-                  activeMode === "addRelatedLink" ? "button button--accent" : "button button--ghost"
-                }
-                onClick={() => toggleMode("addRelatedLink")}
-                type="button"
-              >
-                通常リンク
-              </button>
-            </div>
-            {activeMode !== "idle" ? (
-              <p className="muted editor-palette__hint">
-                起点:{" "}
-                {pendingLinkSourceId
-                  ? findCardLabel(document ?? null, pendingLinkSourceId)
-                  : "カードを選択"}
-              </p>
-            ) : null}
-          </div>
-          <button
-            className="button button--ghost"
-            disabled={!selectedCardId}
-            onClick={() => selectedCardId && toggleCardLock(selectedCardId)}
-            type="button"
-          >
-            {selectedCard?.isLocked ? "ロック解除" : "ロック"}
-          </button>
-          <div className="editor-palette__section">
-            <p className="editor-sectionLabel">色</p>
-            <div className="editor-palette__colors">
-              {colorChoices.map((color) => (
-                <button
-                  aria-label={`色 ${color}`}
-                  className={
-                    nextCardColor === color ? "color-chip color-chip--active" : "color-chip"
-                  }
-                  key={color}
-                  onClick={() =>
-                    selectedCardIds.length > 1
-                      ? bulkSetColor(selectedCardIds, color)
-                      : setNextCardColor(color)
-                  }
-                  style={{ backgroundColor: color }}
-                  type="button"
-                />
-              ))}
-            </div>
-          </div>
-          <div className="editor-palette__section">
-            <p className="editor-sectionLabel">強調</p>
+      {availableTags.length > 0 ? (
+        <section className="editor-filterbar">
+          <div className="editor-filterbar__group">
+            <span>強調</span>
             <div className="tag-chip-list">
               <button
                 className={!activeHighlightTag ? "tag-chip tag-chip--active" : "tag-chip"}
@@ -1529,8 +1516,8 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               ))}
             </div>
           </div>
-          <div className="editor-palette__section">
-            <p className="editor-sectionLabel">絞り込み</p>
+          <div className="editor-filterbar__group">
+            <span>絞り込み</span>
             <div className="tag-chip-list">
               <button
                 className={!activeFilterTag ? "tag-chip tag-chip--active" : "tag-chip"}
@@ -1551,39 +1538,116 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               ))}
             </div>
           </div>
-          <div
-            aria-label="左パネルの幅を変更"
-            className="editor-resizer editor-resizer--palette"
-            onKeyDown={(event) => {
-              if (event.key === "ArrowLeft") {
-                event.preventDefault();
-                nudgePanelWidth("palette", -16);
-              }
-              if (event.key === "ArrowRight") {
-                event.preventDefault();
-                nudgePanelWidth("palette", 16);
-              }
-            }}
-            onPointerDown={(event) => startPanelResize("palette", event.clientX)}
-            role="separator"
-            tabIndex={0}
-          />
-        </aside>
+        </section>
+      ) : null}
 
+      <section
+        className="editor-layout"
+        style={{
+          gridTemplateColumns: isDetailHidden
+            ? "minmax(0, 1fr)"
+            : `minmax(0, 1fr) ${detailWidth}px`,
+        }}
+      >
         <div className="editor-canvas" ref={canvasContainerRef}>
+          {!isPaletteHidden ? (
+            <aside
+              className="editor-palette editor-palette--floating"
+              onPointerDown={(event) => handlePanelEdgePointerDown("palette", event)}
+              style={{ width: paletteWidth }}
+            >
+              <div className="editor-palette__floatingActions">
+                <button
+                  aria-label="カードを追加"
+                  className={
+                    isCreateModalOpen
+                      ? "editor-toolButton editor-toolButton--active"
+                      : "editor-toolButton"
+                  }
+                  onClick={() => setIsCreateModalOpen(true)}
+                  title="カードを追加"
+                  type="button"
+                >
+                  <ToolGlyph kind="add" />
+                </button>
+                <button
+                  aria-label="階層リンク"
+                  className={
+                    activeMode === "addHierarchyLink"
+                      ? "editor-toolButton editor-toolButton--active"
+                      : "editor-toolButton"
+                  }
+                  onClick={() => toggleMode("addHierarchyLink")}
+                  title="階層リンク"
+                  type="button"
+                >
+                  <ToolGlyph kind="branch" />
+                </button>
+                <button
+                  aria-label={selectedCard?.isLocked ? "ロック解除" : "ロック"}
+                  className="editor-toolButton"
+                  disabled={!selectedCardId}
+                  onClick={() => selectedCardId && toggleCardLock(selectedCardId)}
+                  title={selectedCard?.isLocked ? "ロック解除" : "ロック"}
+                  type="button"
+                >
+                  <ToolGlyph kind={selectedCard?.isLocked ? "unlock" : "lock"} />
+                </button>
+                <button
+                  aria-label="ツールを隠す"
+                  className="editor-toolButton"
+                  onClick={() => setIsPaletteHidden(true)}
+                  title="ツールを隠す"
+                  type="button"
+                >
+                  <ToolGlyph kind="close" />
+                </button>
+              </div>
+              <div className="editor-palette__floatingColors">
+                {colorChoices.map((color) => (
+                  <button
+                    aria-label={`色 ${color}`}
+                    className={
+                      nextCardColor === color ? "color-chip color-chip--active" : "color-chip"
+                    }
+                    key={color}
+                    onClick={() =>
+                      selectedCardIds.length > 1
+                        ? bulkSetColor(selectedCardIds, color)
+                        : setNextCardColor(color)
+                    }
+                    style={{ backgroundColor: color }}
+                    type="button"
+                  />
+                ))}
+              </div>
+              {activeMode === "addHierarchyLink" ? (
+                <p className="muted editor-palette__hint">
+                  起点:{" "}
+                  {pendingLinkSourceId
+                    ? findCardLabel(document ?? null, pendingLinkSourceId)
+                    : "カードを選択"}
+                </p>
+              ) : null}
+            </aside>
+          ) : (
+            <button
+              aria-label="ツールを表示"
+              className="editor-panelToggle editor-panelToggle--palette"
+              onClick={() => setIsPaletteHidden(false)}
+              title="ツールを表示"
+              type="button"
+            >
+              <ToolGlyph kind="panel" />
+            </button>
+          )}
           <ReactFlow<KnowledgeCardNode, Edge>
             edges={edgesFromDocument}
             multiSelectionKeyCode={["Meta", "Control", "Shift"]}
             nodeTypes={nodeTypes}
             nodes={flowNodes}
             onInit={setReactFlowInstance}
-            onEdgeClick={(_, edge) => {
-              if (edge.data?.kind === "hierarchy") {
-                removeHierarchyLink(edge.id);
-                return;
-              }
-              removeRelatedLink(edge.id);
-            }}
+            onEdgeClick={(_, edge) => removeHierarchyLink(edge.id)}
             onConnect={handleConnect}
             onNodeClick={(_, node) => handleNodeClick(node.id)}
             onNodeDragStart={() => handleNodeDragStart()}
@@ -1604,257 +1668,239 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           </ReactFlow>
         </div>
 
-        <aside className="editor-detail">
-          {selectedCard ? (
-            <div className="detail-panel">
-              <h2>カード</h2>
-              <label className="field">
-                <span>タイトル</span>
-                <input
-                  className="input"
-                  disabled={selectedCard.isLocked}
-                  onBlur={(event) => commitCardTitle(event.target.value)}
-                  onChange={(event) => setTitleDraft(event.target.value)}
-                  value={titleDraft}
-                />
-              </label>
-              {renderBodySection()}
-              <section className="detail-tags">
-                <div className="detail-tags__header">
-                  <h3>タグ</h3>
+        {!isDetailHidden ? (
+          <aside
+            className="editor-detail"
+            onPointerDown={(event) => handlePanelEdgePointerDown("detail", event)}
+          >
+            {selectedCard ? (
+              <div className="detail-panel">
+                <div className="detail-panel__header">
+                  <h2>カード</h2>
+                  <button
+                    aria-label="詳細を隠す"
+                    className="button button--ghost"
+                    onClick={() => setIsDetailHidden(true)}
+                    type="button"
+                  >
+                    隠す
+                  </button>
                 </div>
-                <div className="detail-tags__list">
-                  {selectedCard.tagNames.map((tag) => (
-                    <button
-                      className="tag-chip tag-chip--filled"
-                      disabled={selectedCard.isLocked}
-                      key={tag}
-                      onClick={() => handleRemoveTag(tag)}
-                      type="button"
-                    >
-                      #{tag} ×
-                    </button>
-                  ))}
-                  {!selectedCard.tagNames.length ? (
-                    <p className="muted">タグはありません。</p>
-                  ) : null}
-                </div>
-                <input
-                  className="input"
-                  disabled={selectedCard.isLocked}
-                  onBlur={() => handleAddTag(tagInputDraft)}
-                  onChange={(event) => setTagInputDraft(event.target.value)}
-                  onKeyDown={handleTagInputKeyDown}
-                  placeholder="例: 設計, backend"
-                  value={tagInputDraft}
-                />
-                <div className="tag-chip-list">
-                  {availableTags
-                    .filter((tag) => !selectedCard.tagNames.includes(tag))
-                    .map((tag) => (
+                <label className="field">
+                  <span>タイトル</span>
+                  <input
+                    className="input"
+                    disabled={selectedCard.isLocked}
+                    onBlur={(event) => commitCardTitle(event.target.value)}
+                    onChange={(event) => setTitleDraft(event.target.value)}
+                    value={titleDraft}
+                  />
+                </label>
+                {renderBodySection()}
+                <section className="detail-tags">
+                  <div className="detail-tags__header">
+                    <h3>タグ</h3>
+                  </div>
+                  <div className="detail-tags__list">
+                    {selectedCard.tagNames.map((tag) => (
                       <button
-                        className="tag-chip"
-                        key={`suggestion-${tag}`}
-                        onClick={() => handleAddTag(tag)}
+                        className="tag-chip tag-chip--filled"
+                        disabled={selectedCard.isLocked}
+                        key={tag}
+                        onClick={() => handleRemoveTag(tag)}
                         type="button"
                       >
-                        + #{tag}
+                        #{tag} ×
                       </button>
                     ))}
-                </div>
-              </section>
-              <div className="field">
-                <span>色</span>
-                <div className="editor-palette__colors">
-                  {colorChoices.map((color) => (
-                    <button
-                      aria-label={`カード色 ${color}`}
-                      className={
-                        selectedCard.color === color
-                          ? "color-chip color-chip--active"
-                          : "color-chip"
-                      }
-                      disabled={selectedCard.isLocked}
-                      key={color}
-                      onClick={() => updateCard(selectedCard.id, { color })}
-                      style={{ backgroundColor: color }}
-                      type="button"
-                    />
-                  ))}
-                </div>
-              </div>
-              <section className="detail-links">
-                <h3>階層リンク</h3>
-                {document?.hierarchyLinks.filter(
-                  (link) =>
-                    link.parentCardId === selectedCard.id || link.childCardId === selectedCard.id,
-                ).length ? (
-                  <ul>
-                    {document?.hierarchyLinks
-                      .filter(
-                        (link) =>
-                          link.parentCardId === selectedCard.id ||
-                          link.childCardId === selectedCard.id,
-                      )
-                      .map((link) => (
-                        <li key={link.id}>
-                          <span>
-                            {link.parentCardId === selectedCard.id ? "下位へ" : "上位から"}{" "}
-                            {findCardLabel(
-                              document ?? null,
-                              link.parentCardId === selectedCard.id
-                                ? link.childCardId
-                                : link.parentCardId,
-                            )}
-                          </span>
-                          <button
-                            className="button button--ghost"
-                            disabled={selectedCard.isLocked}
-                            onClick={() => removeHierarchyLink(link.id)}
-                            type="button"
-                          >
-                            削除
-                          </button>
-                        </li>
+                    {!selectedCard.tagNames.length ? <p className="muted">なし</p> : null}
+                  </div>
+                  <input
+                    className="input"
+                    disabled={selectedCard.isLocked}
+                    onBlur={() => handleAddTag(tagInputDraft)}
+                    onChange={(event) => setTagInputDraft(event.target.value)}
+                    onKeyDown={handleTagInputKeyDown}
+                    placeholder="例: 設計, backend"
+                    value={tagInputDraft}
+                  />
+                  <div className="tag-chip-list">
+                    {availableTags
+                      .filter((tag) => !selectedCard.tagNames.includes(tag))
+                      .map((tag) => (
+                        <button
+                          className="tag-chip"
+                          key={`suggestion-${tag}`}
+                          onClick={() => handleAddTag(tag)}
+                          type="button"
+                        >
+                          + #{tag}
+                        </button>
                       ))}
-                  </ul>
-                ) : (
-                  <p className="muted">なし</p>
-                )}
-              </section>
-              <section className="detail-links">
-                <h3>通常リンク</h3>
-                {document?.relatedLinks.filter(
-                  (link) => link.cardAId === selectedCard.id || link.cardBId === selectedCard.id,
-                ).length ? (
-                  <ul>
-                    {document?.relatedLinks
-                      .filter(
-                        (link) =>
-                          link.cardAId === selectedCard.id || link.cardBId === selectedCard.id,
-                      )
-                      .map((link) => (
-                        <li key={link.id}>
-                          <span>
-                            {findCardLabel(
-                              document ?? null,
-                              link.cardAId === selectedCard.id ? link.cardBId : link.cardAId,
-                            )}
-                          </span>
-                          <button
-                            className="button button--ghost"
-                            disabled={selectedCard.isLocked}
-                            onClick={() => removeRelatedLink(link.id)}
-                            type="button"
-                          >
-                            削除
-                          </button>
-                        </li>
-                      ))}
-                  </ul>
-                ) : (
-                  <p className="muted">なし</p>
-                )}
-              </section>
-              <section className="detail-links">
-                <h3>添付</h3>
-                <input
-                  accept="image/png,image/jpeg,image/webp,application/pdf,text/plain,.txt"
-                  className="sr-only"
-                  disabled={selectedCard.isLocked || isAttachmentPending}
-                  onChange={handleAttachmentFileChange}
-                  ref={attachmentInputRef}
-                  type="file"
-                />
-                <button
-                  className="button button--ghost"
-                  disabled={selectedCard.isLocked || isAttachmentPending}
-                  onClick={() => attachmentInputRef.current?.click()}
-                  type="button"
-                >
-                  {isAttachmentPending ? "添付中..." : "添付追加"}
-                </button>
-                {selectedAttachments.length ? (
-                  <ul>
-                    {selectedAttachments.map((attachment) => (
-                      <li
+                  </div>
+                </section>
+                <div className="field">
+                  <span>色</span>
+                  <div className="detail-swatchList">
+                    {colorChoices.map((color) => (
+                      <button
+                        aria-label={`カード色 ${color}`}
                         className={
-                          attachment.kind === "image"
-                            ? "detail-attachment detail-attachment--image"
-                            : undefined
+                          selectedCard.color === color
+                            ? "color-chip color-chip--active"
+                            : "color-chip"
                         }
-                        key={attachment.id}
-                      >
-                        <div className="detail-attachment__body">
-                          <span>
-                            [{attachment.kind}] {attachment.fileName}
-                          </span>
-                          {attachment.kind === "image" ? (
-                            attachmentPreviewUrls[attachment.id] ? (
-                              <img
-                                alt={attachment.fileName}
-                                className="detail-attachment__preview"
-                                src={attachmentPreviewUrls[attachment.id]}
-                              />
-                            ) : (
-                              <p className="muted">読み込み中</p>
-                            )
-                          ) : null}
-                        </div>
-                        <div className="detail-links__actions">
-                          <button
-                            className="button button--ghost"
-                            onClick={() => handleAttachmentOpen(attachment.id)}
-                            type="button"
-                          >
-                            開く
-                          </button>
-                          <button
-                            className="button button--ghost"
-                            disabled={selectedCard.isLocked || isAttachmentPending}
-                            onClick={() => handleAttachmentDelete(attachment.id)}
-                            type="button"
-                          >
-                            削除
-                          </button>
-                        </div>
-                      </li>
+                        disabled={selectedCard.isLocked}
+                        key={color}
+                        onClick={() => updateCard(selectedCard.id, { color })}
+                        style={{ backgroundColor: color }}
+                        type="button"
+                      />
                     ))}
-                  </ul>
-                ) : (
-                  <p className="muted">なし</p>
-                )}
-              </section>
-            </div>
-          ) : selectedCardIds.length > 1 ? (
-            <div className="detail-panel detail-panel--empty">
-              <h2>複数選択中</h2>
-              <p className="muted">一括色変更、一括ロック、一括削除は上部バーから実行できます。</p>
-            </div>
-          ) : (
-            <div className="detail-panel detail-panel--empty">
-              <h2>カードを選択してください</h2>
-              <p className="muted">右パネルではタイトル、本文、タグ、色、リンクを編集できます。</p>
-            </div>
-          )}
-          <div
-            aria-label="右パネルの幅を変更"
-            className="editor-resizer editor-resizer--detail"
-            onKeyDown={(event) => {
-              if (event.key === "ArrowLeft") {
-                event.preventDefault();
-                nudgePanelWidth("detail", 16);
-              }
-              if (event.key === "ArrowRight") {
-                event.preventDefault();
-                nudgePanelWidth("detail", -16);
-              }
-            }}
-            onPointerDown={(event) => startPanelResize("detail", event.clientX)}
-            role="separator"
-            tabIndex={0}
-          />
-        </aside>
+                  </div>
+                </div>
+                <section className="detail-links">
+                  <h3>階層リンク</h3>
+                  {document?.hierarchyLinks.filter(
+                    (link) =>
+                      link.parentCardId === selectedCard.id || link.childCardId === selectedCard.id,
+                  ).length ? (
+                    <ul>
+                      {document?.hierarchyLinks
+                        .filter(
+                          (link) =>
+                            link.parentCardId === selectedCard.id ||
+                            link.childCardId === selectedCard.id,
+                        )
+                        .map((link) => (
+                          <li key={link.id}>
+                            <span>
+                              {link.parentCardId === selectedCard.id ? "下位へ" : "上位から"}{" "}
+                              {findCardLabel(
+                                document ?? null,
+                                link.parentCardId === selectedCard.id
+                                  ? link.childCardId
+                                  : link.parentCardId,
+                              )}
+                            </span>
+                            <button
+                              className="button button--ghost"
+                              disabled={selectedCard.isLocked}
+                              onClick={() => removeHierarchyLink(link.id)}
+                              type="button"
+                            >
+                              削除
+                            </button>
+                          </li>
+                        ))}
+                    </ul>
+                  ) : (
+                    <p className="muted">なし</p>
+                  )}
+                </section>
+                <section className="detail-links">
+                  <h3>添付</h3>
+                  <input
+                    accept="image/png,image/jpeg,image/webp,application/pdf,text/plain,.txt"
+                    className="sr-only"
+                    disabled={selectedCard.isLocked || isAttachmentPending}
+                    onChange={handleAttachmentFileChange}
+                    ref={attachmentInputRef}
+                    type="file"
+                  />
+                  <button
+                    className="button button--ghost"
+                    disabled={selectedCard.isLocked || isAttachmentPending}
+                    onClick={() => attachmentInputRef.current?.click()}
+                    type="button"
+                  >
+                    {isAttachmentPending ? "添付中..." : "添付追加"}
+                  </button>
+                  {selectedAttachments.length ? (
+                    <ul>
+                      {selectedAttachments.map((attachment) => (
+                        <li
+                          className={
+                            attachment.kind === "image"
+                              ? "detail-attachment detail-attachment--image"
+                              : undefined
+                          }
+                          key={attachment.id}
+                        >
+                          <div className="detail-attachment__body">
+                            <span>
+                              [{attachment.kind}] {attachment.fileName}
+                            </span>
+                            {attachment.kind === "image" ? (
+                              attachmentPreviewUrls[attachment.id] ? (
+                                <img
+                                  alt={attachment.fileName}
+                                  className="detail-attachment__preview"
+                                  src={attachmentPreviewUrls[attachment.id]}
+                                />
+                              ) : (
+                                <p className="muted">読み込み中</p>
+                              )
+                            ) : null}
+                          </div>
+                          <div className="detail-links__actions">
+                            <button
+                              className="button button--ghost"
+                              onClick={() => handleAttachmentOpen(attachment.id)}
+                              type="button"
+                            >
+                              開く
+                            </button>
+                            <button
+                              className="button button--ghost"
+                              disabled={selectedCard.isLocked || isAttachmentPending}
+                              onClick={() => handleAttachmentDelete(attachment.id)}
+                              type="button"
+                            >
+                              削除
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="muted">なし</p>
+                  )}
+                </section>
+              </div>
+            ) : selectedCardIds.length > 1 ? (
+              <div className="detail-panel detail-panel--empty">
+                <div className="detail-panel__header">
+                  <h2>複数選択</h2>
+                  <button
+                    aria-label="詳細を隠す"
+                    className="button button--ghost"
+                    onClick={() => setIsDetailHidden(true)}
+                    type="button"
+                  >
+                    隠す
+                  </button>
+                </div>
+                <p className="muted">操作は上部バーに表示されます。</p>
+              </div>
+            ) : (
+              <div className="detail-panel detail-panel--empty">
+                <div className="detail-panel__header">
+                  <h2>未選択</h2>
+                  <button
+                    aria-label="詳細を隠す"
+                    className="button button--ghost"
+                    onClick={() => setIsDetailHidden(true)}
+                    type="button"
+                  >
+                    隠す
+                  </button>
+                </div>
+                <p className="muted">カードを選択すると表示されます。</p>
+              </div>
+            )}
+          </aside>
+        ) : null}
       </section>
 
       {selectedCard && isBodyExpanded ? (
