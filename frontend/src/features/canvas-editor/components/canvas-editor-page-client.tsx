@@ -7,9 +7,12 @@ import {
   type Edge,
   MarkerType,
   MiniMap,
+  type NodeChange,
   type NodeTypes,
   ReactFlow,
   type ReactFlowInstance,
+  applyNodeChanges,
+  useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
@@ -271,9 +274,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [isThumbnailPending, setIsThumbnailPending] = useState(false);
   const [tagInputDraft, setTagInputDraft] = useState("");
   const [titleDraft, setTitleDraft] = useState("");
-  const [uiNodePositions, setUiNodePositions] = useState<Record<string, { x: number; y: number }>>(
-    {},
-  );
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const bodyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
@@ -356,7 +356,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       visibleCards.map((card) => ({
         id: card.id,
         type: "knowledgeCard",
-        position: uiNodePositions[card.id] ?? { x: card.x, y: card.y },
+        position: { x: card.x, y: card.y },
         draggable: !card.isLocked,
         selectable: true,
         data: {
@@ -369,8 +369,9 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           tagSummary: card.tagNames.slice(0, 2).join(", "),
         },
       })),
-    [activeHighlightTag, uiNodePositions, visibleCards],
+    [activeHighlightTag, visibleCards],
   );
+  const [flowNodes, setFlowNodes] = useNodesState<KnowledgeCardNode>(nodesFromDocument);
 
   const edgesFromDocument = useMemo<Edge[]>(
     () => [
@@ -456,11 +457,46 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   }, [selectedCard?.body, selectedCard?.title]);
 
   useEffect(() => {
-    const nextPositions = Object.fromEntries(
-      (document?.cards ?? []).map((card) => [card.id, { x: card.x, y: card.y }]),
-    );
-    setUiNodePositions(nextPositions);
-  }, [document?.cards]);
+    setFlowNodes((currentNodes) => {
+      const currentNodeById = new Map(currentNodes.map((node) => [node.id, node]));
+      const nextNodes = nodesFromDocument.map((node) => {
+        const currentNode = currentNodeById.get(node.id);
+        if (!currentNode) {
+          return node;
+        }
+
+        return {
+          ...node,
+          dragging: currentNode.dragging,
+          position: currentNode.dragging ? currentNode.position : node.position,
+          selected: currentNode.selected,
+        };
+      });
+
+      const isSame =
+        currentNodes.length === nextNodes.length &&
+        currentNodes.every((node, index) => {
+          const nextNode = nextNodes[index];
+          return (
+            nextNode &&
+            node.id === nextNode.id &&
+            node.position.x === nextNode.position.x &&
+            node.position.y === nextNode.position.y &&
+            node.dragging === nextNode.dragging &&
+            node.selected === nextNode.selected &&
+            node.data.title === nextNode.data.title &&
+            node.data.color === nextNode.data.color &&
+            node.data.isLocked === nextNode.data.isLocked &&
+            node.data.isHighlighted === nextNode.data.isHighlighted &&
+            node.data.isDimmed === nextNode.data.isDimmed &&
+            node.data.childCount === nextNode.data.childCount &&
+            node.data.tagSummary === nextNode.data.tagSummary
+          );
+        });
+
+      return isSame ? currentNodes : nextNodes;
+    });
+  }, [nodesFromDocument, setFlowNodes]);
 
   useEffect(() => {
     if (activeFilterTag && !availableTags.includes(activeFilterTag)) {
@@ -995,6 +1031,10 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     setInteractionMessage(`「${card.title}」の位置へ移動しました。`);
   }
 
+  function handleNodesChange(changes: NodeChange<KnowledgeCardNode>[]) {
+    setFlowNodes((currentNodes) => applyNodeChanges(changes, currentNodes));
+  }
+
   function handleAutoLayout() {
     if (!document || document.cards.length === 0) {
       return;
@@ -1447,7 +1487,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             edges={edgesFromDocument}
             multiSelectionKeyCode={["Meta", "Control", "Shift"]}
             nodeTypes={nodeTypes}
-            nodes={nodesFromDocument}
+            nodes={flowNodes}
             onInit={setReactFlowInstance}
             onEdgeClick={(_, edge) => {
               if (edge.data?.kind === "hierarchy") {
@@ -1458,12 +1498,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             }}
             onConnect={handleConnect}
             onNodeClick={(_, node) => handleNodeClick(node.id)}
-            onNodeDrag={(_, node) => {
-              setUiNodePositions((current) => ({
-                ...current,
-                [node.id]: { x: node.position.x, y: node.position.y },
-              }));
-            }}
+            onNodesChange={handleNodesChange}
             onNodeDragStop={(_, node) => moveCard(node.id, node.position.x, node.position.y)}
             onPaneClick={() => {
               selectCard(null);

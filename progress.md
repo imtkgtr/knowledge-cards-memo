@@ -559,3 +559,17 @@
   Markdown は live preview 方式であり、Notion のように本文欄そのものが WYSIWYG になるわけではない。複数選択やリンク追加の E2E はまだ未追加。
 - 次のアクション:
   この修正をコミットし、次はリンク追加とパネルリサイズも Playwright シナリオへ広げる。
+
+## 2026-04-22 11:07
+- 変更内容:
+  カード座標を毎フレーム React state で差し替える方式をやめ、React Flow の `useNodesState` と `applyNodeChanges` を使って、ドラッグ中のノード位置は editor 内のローカル node state で処理する構成へ切り替えた。document 由来のノード情報は `useEffect` で同期しつつ、現在ドラッグ中のノード座標だけは保持するようにしたため、ドラッグ中の全体再計算を減らしている。確認は最新 build を使った `next start` on `3003` で行い、Playwright smoke test は pass した。
+- 目的:
+  直近修正後も残っていた「カードドラッグがまだ引っかかる」という体感上の問題に対して、ドラッグ中の state 更新経路そのものを軽くするため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`progress.md`
+- 未解決事項:
+  Playwright では editor 破損の回帰までは見られるが、ドラッグの滑らかさ自体は自動計測していない。必要なら drag 操作を含む manual QA か、将来的にパフォーマンス計測を追加する必要がある。
+- 次のアクション:
+  このドラッグ経路の見直しをコミットして push し、ユーザ環境で体感が改善したかを確認する。改善が足りなければ次はカードノード再描画数の削減や detail panel 側 state の分離を進める。
