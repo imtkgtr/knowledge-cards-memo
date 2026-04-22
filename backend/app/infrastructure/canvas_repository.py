@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+import re
 from typing import Protocol
+import unicodedata
 from uuid import uuid4
 
 from fastapi import Depends, HTTPException, status
@@ -584,11 +586,26 @@ class SupabaseCanvasRepository:
         attachment_id: str,
         file_name: str,
     ) -> str:
-        sanitized_name = "".join(
-            char if char.isalnum() or char in {".", "-", "_"} else "-"
-            for char in Path(file_name).name
-        )
+        sanitized_name = SupabaseCanvasRepository._sanitize_storage_file_name(file_name)
         return f"{user_id}/{canvas_id}/{card_id}/{attachment_id}-{sanitized_name}"
+
+    @staticmethod
+    def _sanitize_storage_file_name(file_name: str) -> str:
+        normalized_name = unicodedata.normalize("NFKD", Path(file_name).name)
+        ascii_name = normalized_name.encode("ascii", "ignore").decode("ascii")
+        suffix = "".join(
+            char.lower()
+            for char in Path(ascii_name).suffix
+            if char.isascii() and (char.isalnum() or char in {".", "-", "_"})
+        )
+        stem = Path(ascii_name).stem or "file"
+        sanitized_stem = re.sub(r"[^A-Za-z0-9_-]+", "-", stem)
+        sanitized_stem = re.sub(r"-{2,}", "-", sanitized_stem).strip("-_")
+        if not sanitized_stem:
+            sanitized_stem = "file"
+        if suffix in {".", "-", "_"}:
+            suffix = ""
+        return f"{sanitized_stem}{suffix}"
 
     @staticmethod
     def _build_thumbnail_path(user_id: str, canvas_id: str) -> str:

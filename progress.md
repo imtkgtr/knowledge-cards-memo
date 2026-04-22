@@ -686,6 +686,20 @@
 - 次のアクション:
   必要になった段階で、競合比較表や差別化メッセージの形に展開する。
 
+## 2026-04-22 15:08
+- 変更内容:
+  Supabase Storage へ添付を保存する際の key 生成を見直し、日本語や空白を含むファイル名でも ASCII ベースの安全な path へ正規化して upload できるようにした。あわせて、非 ASCII ファイル名が期待どおりの storage path に変換されることを固定する backend test を追加した。
+- 目的:
+  添付 upload 時に `InvalidKey` で 500 になっていた不具合を解消し、スクリーンショットのような日本語ファイル名でも保存できるようにするため。
+- 影響範囲:
+  `backend/`、`progress.md`
+- 関連ファイル:
+  `backend/app/infrastructure/canvas_repository.py`、`backend/tests/test_canvases.py`、`progress.md`
+- 未解決事項:
+  今回は storage key の安全化のみで、同名ファイルの扱いは既存どおり attachment id で一意化している。ブラウザ実機での添付再確認はこの修正後に別途確認する。
+- 次のアクション:
+  backend test を実行して修正を確認し、この不具合修正を単独コミットして push する。
+
 ## 2026-04-22 14:28
 - 変更内容:
   仕様書と現在の実装を棚卸しし、editor 画面に残っていた取りこぼしを追加した。topbar には `書き出し` を追加し、一覧画面と同じ JSON export を editor から直接実行できるようにした。複数選択バーには `選択を基準に整列` を追加し、選択中カードの先頭を anchor にして全体整列できるようにした。確認は `bun run lint`、`bun run build`、`PLAYWRIGHT_BASE_URL=http://127.0.0.1:3010 bun run test:e2e tests/e2e/canvas-editor-smoke.spec.ts` で行った。

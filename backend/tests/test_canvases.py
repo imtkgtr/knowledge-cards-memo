@@ -4,7 +4,10 @@ from fastapi.testclient import TestClient
 
 from app.api.routes.canvases import get_canvas_service
 from app.core.auth import AuthenticatedUser, get_current_user
-from app.infrastructure.canvas_repository import build_memory_canvas_repository
+from app.infrastructure.canvas_repository import (
+    SupabaseCanvasRepository,
+    build_memory_canvas_repository,
+)
 from app.main import app
 from app.services.canvas_service import CanvasService
 
@@ -424,6 +427,21 @@ def test_attachment_crud_flow() -> None:
 
     delete_response = context.client.delete(f"/api/attachments/{attachment['id']}")
     assert delete_response.status_code == 204
+
+
+def test_attachment_path_sanitizes_non_ascii_filename() -> None:
+    storage_path = SupabaseCanvasRepository._build_attachment_path(
+        user_id="user-1",
+        canvas_id="canvas-1",
+        card_id="card-1",
+        attachment_id="attachment-1",
+        file_name="スクリーンショット 2026-04-22 14.52.36.png",
+    )
+
+    file_part = storage_path.split("/")[-1]
+    assert storage_path == "user-1/canvas-1/card-1/attachment-1-2026-04-22-14-52-36.png"
+    assert file_part.endswith(".png")
+    assert all(ord(char) < 128 for char in file_part)
 
 
 def test_thumbnail_crud_flow() -> None:
