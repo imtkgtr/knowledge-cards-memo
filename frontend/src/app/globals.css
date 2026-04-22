@@ -44,6 +44,12 @@ input {
   font: inherit;
 }
 
+input,
+textarea,
+select {
+  min-width: 0;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -89,6 +95,7 @@ input {
   background: var(--surface-strong);
   color: var(--text);
   cursor: pointer;
+  white-space: nowrap;
   transition: transform 120ms ease, background-color 120ms ease;
 }
 
@@ -115,6 +122,7 @@ input {
 .field {
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 
 .field span {
@@ -123,6 +131,7 @@ input {
 }
 
 .input {
+  width: 100%;
   min-height: 48px;
   padding: 0 14px;
   border: 1px solid var(--line);
@@ -209,8 +218,14 @@ input {
   box-shadow: var(--shadow);
 }
 
+.editor-topbar > div:first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .editor-topbar__title {
-  width: min(100%, 420px);
+  width: min(100%, 460px);
+  min-width: 0;
   margin-bottom: 8px;
   padding: 0;
   border: none;
@@ -223,6 +238,8 @@ input {
 .editor-topbar__actions {
   display: flex;
   align-items: flex-start;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 12px;
 }
 
@@ -269,6 +286,7 @@ input {
 .search-result span {
   color: var(--muted);
   font-size: 0.9rem;
+  overflow-wrap: anywhere;
 }
 
 .editor-layout {
@@ -338,9 +356,28 @@ input {
   top: 20px;
 }
 
+.editor-palette > .button {
+  width: 100%;
+}
+
 .editor-palette__section {
   display: grid;
   gap: 10px;
+  min-width: 0;
+}
+
+.editor-palette__stack {
+  display: grid;
+  gap: 10px;
+}
+
+.editor-palette__stack .button {
+  width: 100%;
+}
+
+.editor-palette__hint {
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
 }
 
 .editor-palette__colors {
@@ -349,10 +386,18 @@ input {
   gap: 10px;
 }
 
+.editor-sectionLabel {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
 .tag-chip-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .tag-chip {
@@ -365,6 +410,8 @@ input {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.72);
   color: var(--text);
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .tag-chip--active {
@@ -401,11 +448,13 @@ input {
 
 .editor-detail {
   overflow: visible;
+  min-width: 0;
 }
 
 .detail-panel {
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .detail-panel h2 {
@@ -622,6 +671,13 @@ input {
   border: 1px solid var(--line);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.72);
+  min-width: 0;
+}
+
+.detail-links li > span,
+.detail-attachment__body > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .detail-attachment {
@@ -642,6 +698,7 @@ input {
 }
 
 .textarea {
+  width: 100%;
   min-height: 180px;
   padding: 12px 14px;
   border: 1px solid var(--line);
@@ -709,16 +766,20 @@ input {
   display: flex;
   justify-content: space-between;
   gap: 8px;
+  align-items: flex-start;
 }
 
 .card-node__meta {
   margin: 8px 0 0;
   color: rgba(31, 26, 19, 0.68);
   font-size: 0.8rem;
+  overflow-wrap: anywhere;
 }
 
 .card-node strong {
   font-size: calc(1rem + var(--card-node-child-weight) * 0.03rem);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .dashboard-header,

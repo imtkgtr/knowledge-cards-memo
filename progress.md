@@ -601,3 +601,17 @@
   現在のページ編集は plain textarea ベースであり、Notion のような block editor ではない。必要なら将来は本文エディタを別コンポーネントとして差し替える余地がある。
 - 次のアクション:
   lint / build / E2E を通したうえでこの UI 変更をコミットし、実ブラウザで本文プレビューの押しやすさとページ編集の見え方を確認する。
+
+## 2026-04-22 11:39
+- 変更内容:
+  editor の見た目を整理し、左パレットの構成を `リンク / 色 / 強調 / 絞り込み` の短いラベル中心へ再編した。ボタン文言も `カードを追加`、`階層リンク` のように自然な日本語へ寄せ、説明文は起点表示など必要最低限に削った。右パネルでも `カード詳細` を `カード` に短縮し、タグやリンク、添付のセクションは説明文を減らして入力例や空状態の短い表示へ寄せた。CSS 側では `min-width: 0`、`width: 100%`、`overflow-wrap: anywhere`、`flex-wrap` を追加し、入力欄や動的テキストが枠からはみ出しにくいよう調整した。Playwright smoke test の文言参照も新 UI に合わせて更新し、最新 build を `next start` on `3006` で確認して pass した。
+- 目的:
+  使い方の説明を読ませるよりも、短いラベルと入力例で理解できる画面へ寄せつつ、日本語の不自然さ、改行崩れ、入力欄のはみ出しをまとめて整えるため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/app/globals.css`、`frontend/tests/e2e/canvas-editor-smoke.spec.ts`、`progress.md`
+- 未解決事項:
+  今回は主に editor 画面の文言とレイアウト整理であり、一覧画面やログイン画面の文言・余白まではまだ手を入れていない。
+- 次のアクション:
+  この UI 整理をコミットして push し、次は一覧画面やモーダル類も同じ方針で文言と見た目を整える。

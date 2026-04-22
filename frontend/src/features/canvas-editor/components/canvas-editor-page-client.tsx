@@ -266,8 +266,8 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<string, string>>({});
   const [isBodyExpanded, setIsBodyExpanded] = useState(false);
-  const [paletteWidth, setPaletteWidth] = useState(160);
-  const [detailWidth, setDetailWidth] = useState(260);
+  const [paletteWidth, setPaletteWidth] = useState(196);
+  const [detailWidth, setDetailWidth] = useState(288);
   const [pendingLinkSourceId, setPendingLinkSourceId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isAttachmentPending, setIsAttachmentPending] = useState(false);
@@ -1267,11 +1267,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         <div className="detail-markdown__header">
           <div>
             <h3>本文</h3>
-            <p className="muted">
-              {expanded
-                ? "ページ上でそのまま編集できます。閉じると右パネルでは Markdown プレビューに戻ります。"
-                : "右パネルでは Markdown プレビューを表示します。クリックするとページ表示で編集できます。"}
-            </p>
+            <p className="muted">{expanded ? "Markdown で入力" : "クリックで編集"}</p>
           </div>
           <div className="detail-markdown__actions">
             <button
@@ -1327,7 +1323,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             value={canvasNameDraft}
           />
           <p className="muted">
-            カード数: {document?.cards.length ?? 0} / 保存状態: {saveStatusLabel}
+            {document?.cards.length ?? 0} cards / {saveStatusLabel}
           </p>
         </div>
         <div className="editor-topbar__actions">
@@ -1335,7 +1331,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             <input
               className="input search-panel__input"
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="タイトル・本文を検索"
+              placeholder="検索"
               value={searchQuery}
             />
             {searchQuery.trim() ? (
@@ -1369,7 +1365,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             onClick={() => setIsCreateModalOpen(true)}
             type="button"
           >
-            カード追加
+            カードを追加
           </button>
           <button className="button button--ghost" onClick={handleAutoLayout} type="button">
             整列
@@ -1447,37 +1443,41 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             onClick={() => setIsCreateModalOpen(true)}
             type="button"
           >
-            カード追加
+            カードを追加
           </button>
-          <button
-            className={
-              activeMode === "addHierarchyLink" ? "button button--accent" : "button button--ghost"
-            }
-            onClick={() => toggleMode("addHierarchyLink")}
-            type="button"
-          >
-            階層リンク追加
-          </button>
-          <button
-            className={
-              activeMode === "addRelatedLink" ? "button button--accent" : "button button--ghost"
-            }
-            onClick={() => toggleMode("addRelatedLink")}
-            type="button"
-          >
-            通常リンク追加
-          </button>
-          {activeMode !== "idle" ? (
-            <>
-              <p className="muted">
+          <div className="editor-palette__section">
+            <p className="editor-sectionLabel">リンク</p>
+            <div className="editor-palette__stack">
+              <button
+                className={
+                  activeMode === "addHierarchyLink"
+                    ? "button button--accent"
+                    : "button button--ghost"
+                }
+                onClick={() => toggleMode("addHierarchyLink")}
+                type="button"
+              >
+                階層リンク
+              </button>
+              <button
+                className={
+                  activeMode === "addRelatedLink" ? "button button--accent" : "button button--ghost"
+                }
+                onClick={() => toggleMode("addRelatedLink")}
+                type="button"
+              >
+                通常リンク
+              </button>
+            </div>
+            {activeMode !== "idle" ? (
+              <p className="muted editor-palette__hint">
                 起点:{" "}
                 {pendingLinkSourceId
                   ? findCardLabel(document ?? null, pendingLinkSourceId)
-                  : "未選択"}
+                  : "カードを選択"}
               </p>
-              <p className="muted">カード上下の端子から線を引いて接続できます。</p>
-            </>
-          ) : null}
+            ) : null}
+          </div>
           <button
             className="button button--ghost"
             disabled={!selectedCardId}
@@ -1486,24 +1486,29 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           >
             {selectedCard?.isLocked ? "ロック解除" : "ロック"}
           </button>
-          <div className="editor-palette__colors">
-            {colorChoices.map((color) => (
-              <button
-                aria-label={`色 ${color}`}
-                className={nextCardColor === color ? "color-chip color-chip--active" : "color-chip"}
-                key={color}
-                onClick={() =>
-                  selectedCardIds.length > 1
-                    ? bulkSetColor(selectedCardIds, color)
-                    : setNextCardColor(color)
-                }
-                style={{ backgroundColor: color }}
-                type="button"
-              />
-            ))}
+          <div className="editor-palette__section">
+            <p className="editor-sectionLabel">色</p>
+            <div className="editor-palette__colors">
+              {colorChoices.map((color) => (
+                <button
+                  aria-label={`色 ${color}`}
+                  className={
+                    nextCardColor === color ? "color-chip color-chip--active" : "color-chip"
+                  }
+                  key={color}
+                  onClick={() =>
+                    selectedCardIds.length > 1
+                      ? bulkSetColor(selectedCardIds, color)
+                      : setNextCardColor(color)
+                  }
+                  style={{ backgroundColor: color }}
+                  type="button"
+                />
+              ))}
+            </div>
           </div>
           <div className="editor-palette__section">
-            <p className="muted">タグ強調</p>
+            <p className="editor-sectionLabel">強調</p>
             <div className="tag-chip-list">
               <button
                 className={!activeHighlightTag ? "tag-chip tag-chip--active" : "tag-chip"}
@@ -1525,7 +1530,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             </div>
           </div>
           <div className="editor-palette__section">
-            <p className="muted">タグ絞り込み</p>
+            <p className="editor-sectionLabel">絞り込み</p>
             <div className="tag-chip-list">
               <button
                 className={!activeFilterTag ? "tag-chip tag-chip--active" : "tag-chip"}
@@ -1602,7 +1607,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         <aside className="editor-detail">
           {selectedCard ? (
             <div className="detail-panel">
-              <h2>カード詳細</h2>
+              <h2>カード</h2>
               <label className="field">
                 <span>タイトル</span>
                 <input
@@ -1617,7 +1622,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               <section className="detail-tags">
                 <div className="detail-tags__header">
                   <h3>タグ</h3>
-                  <p className="muted">Enter / Tab / カンマ区切りで複数追加できます。</p>
                 </div>
                 <div className="detail-tags__list">
                   {selectedCard.tagNames.map((tag) => (
@@ -1641,7 +1645,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                   onBlur={() => handleAddTag(tagInputDraft)}
                   onChange={(event) => setTagInputDraft(event.target.value)}
                   onKeyDown={handleTagInputKeyDown}
-                  placeholder="例: 設計, backend, 要確認"
+                  placeholder="例: 設計, backend"
                   value={tagInputDraft}
                 />
                 <div className="tag-chip-list">
@@ -1715,7 +1719,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                       ))}
                   </ul>
                 ) : (
-                  <p className="muted">リンクはありません。</p>
+                  <p className="muted">なし</p>
                 )}
               </section>
               <section className="detail-links">
@@ -1749,7 +1753,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                       ))}
                   </ul>
                 ) : (
-                  <p className="muted">リンクはありません。</p>
+                  <p className="muted">なし</p>
                 )}
               </section>
               <section className="detail-links">
@@ -1793,7 +1797,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                                 src={attachmentPreviewUrls[attachment.id]}
                               />
                             ) : (
-                              <p className="muted">プレビューを読み込み中です。</p>
+                              <p className="muted">読み込み中</p>
                             )
                           ) : null}
                         </div>
@@ -1818,7 +1822,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                     ))}
                   </ul>
                 ) : (
-                  <p className="muted">添付はありません。</p>
+                  <p className="muted">なし</p>
                 )}
               </section>
             </div>

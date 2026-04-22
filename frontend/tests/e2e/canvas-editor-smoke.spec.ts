@@ -73,15 +73,15 @@ test("ログインしてキャンバス作成とカード追加まで進める",
   await page.getByRole("link", { name: canvasName }).click();
 
   await page.waitForURL(/\/canvases\/.+/);
-  await expect(page.getByRole("button", { name: "カード追加" }).first()).toBeVisible();
-  await page.getByRole("button", { name: "カード追加" }).first().click();
+  await expect(page.getByRole("button", { name: "カードを追加" }).first()).toBeVisible();
+  await page.getByRole("button", { name: "カードを追加" }).first().click();
 
   await expect(page.getByRole("heading", { name: "カードを作成" })).toBeVisible();
   await page.getByLabel("タイトル").fill(cardTitle);
   await page.getByRole("button", { name: "作成する" }).click();
 
   await expect(page.getByText(cardTitle).first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "カード詳細" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "カード" })).toBeVisible();
   await page.getByRole("button", { name: "ページで編集" }).click();
   await expect(page.getByLabel("本文ページ編集")).toBeVisible();
   await page.getByLabel("本文ページ編集").fill(markdownBody);
