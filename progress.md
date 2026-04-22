@@ -587,3 +587,17 @@
   backend の `save_canvas_document` 自体は依然として `delete -> insert` 方式のため、将来的には DB トランザクションや upsert ベースへ寄せた方が安全。現時点では frontend 側で直列化して衝突を避けている。
 - 次のアクション:
   この保存直列化とドラッグ安定化をコミットして push し、ユーザ環境で 500 とカード消失が再発しないかを確認する。必要なら次は backend 保存処理のトランザクション化も検討する。
+
+## 2026-04-22 11:26
+- 変更内容:
+  本文 UI を「右パネルでは常時 Markdown プレビュー、クリック時だけ中央ページで編集」に変更した。右パネルの本文セクションは preview surface をそのまま押せる形にし、`ページで編集` で開くモーダルでは textarea に集中して編集できるようにした。ページ表示を閉じると右パネルへ戻り、プレビューに内容が反映される。Playwright smoke test も、本文プレビューからページ編集を開いて入力し、閉じたあとにプレビューへ見出しと箇条書きが出る流れへ更新した。
+- 目的:
+  本文は通常時に読む UI を優先しつつ、編集時だけノートのような中央ページへ集中できる体験へ寄せるため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/app/globals.css`、`frontend/tests/e2e/canvas-editor-smoke.spec.ts`、`progress.md`
+- 未解決事項:
+  現在のページ編集は plain textarea ベースであり、Notion のような block editor ではない。必要なら将来は本文エディタを別コンポーネントとして差し替える余地がある。
+- 次のアクション:
+  lint / build / E2E を通したうえでこの UI 変更をコミットし、実ブラウザで本文プレビューの押しやすさとページ編集の見え方を確認する。

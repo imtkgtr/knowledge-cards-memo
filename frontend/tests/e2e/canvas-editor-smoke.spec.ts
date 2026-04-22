@@ -82,7 +82,10 @@ test("ログインしてキャンバス作成とカード追加まで進める",
 
   await expect(page.getByText(cardTitle).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "カード詳細" })).toBeVisible();
-  await page.getByLabel("本文編集").fill(markdownBody);
+  await page.getByRole("button", { name: "ページで編集" }).click();
+  await expect(page.getByLabel("本文ページ編集")).toBeVisible();
+  await page.getByLabel("本文ページ編集").fill(markdownBody);
+  await page.getByRole("button", { name: "編集を閉じる" }).click();
 
   const preview = page.locator(".detail-markdown__preview");
   await expect(preview.getByText("見出し")).toBeVisible();

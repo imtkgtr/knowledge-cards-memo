@@ -474,6 +474,30 @@ input {
   gap: 14px;
 }
 
+.detail-markdown__previewButton {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.detail-markdown__previewButton:disabled {
+  cursor: not-allowed;
+}
+
+.detail-markdown__previewButton .markdown-surface {
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.detail-markdown__previewButton:hover .markdown-surface,
+.detail-markdown__previewButton:focus-visible .markdown-surface {
+  border-color: rgba(20, 92, 98, 0.28);
+  box-shadow: 0 0 0 3px rgba(20, 92, 98, 0.08);
+  transform: translateY(-1px);
+}
+
 .detail-markdown__preview {
   display: grid;
   gap: 8px;

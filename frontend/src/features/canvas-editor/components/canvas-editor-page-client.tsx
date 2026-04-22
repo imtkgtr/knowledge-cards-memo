@@ -776,6 +776,17 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     return () => window.clearTimeout(timeoutId);
   }, [document, isDirty, saveState]);
 
+  useEffect(() => {
+    if (!isBodyExpanded) {
+      return;
+    }
+    const animationFrameId = window.requestAnimationFrame(() => {
+      bodyTextareaRef.current?.focus();
+      bodyTextareaRef.current?.setSelectionRange(bodyDraft.length, bodyDraft.length);
+    });
+    return () => window.cancelAnimationFrame(animationFrameId);
+  }, [bodyDraft.length, isBodyExpanded]);
+
   function handleCreateCard(title: string) {
     const canvasBounds = canvasContainerRef.current?.getBoundingClientRect();
     const defaultPosition = {
@@ -1257,7 +1268,9 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           <div>
             <h3>本文</h3>
             <p className="muted">
-              プレーンテキストでそのまま書けます。必要なら Markdown 記法も文字として残せます。
+              {expanded
+                ? "ページ上でそのまま編集できます。閉じると右パネルでは Markdown プレビューに戻ります。"
+                : "右パネルでは Markdown プレビューを表示します。クリックするとページ表示で編集できます。"}
             </p>
           </div>
           <div className="detail-markdown__actions">
@@ -1266,35 +1279,37 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               onClick={() => setIsBodyExpanded((current) => !current)}
               type="button"
             >
-              {expanded ? "ページ表示を閉じる" : "ページで開く"}
+              {expanded ? "編集を閉じる" : "ページで編集"}
             </button>
           </div>
         </div>
         <div className="detail-markdown__workspace">
-          <label className="field">
-            <span>{expanded ? "本文ページ編集" : "本文編集"}</span>
-            <textarea
-              className={expanded ? "textarea textarea--page" : "textarea"}
+          {expanded ? (
+            <label className="field">
+              <span>本文ページ編集</span>
+              <textarea
+                className="textarea textarea--page"
+                disabled={!canEditBody}
+                onBlur={(event) => commitCardBody(event.target.value)}
+                onChange={(event) => setBodyDraft(event.target.value)}
+                placeholder="ここに本文を書いてください。必要なら Markdown 記法もそのまま使えます。"
+                ref={bodyTextareaRef}
+                value={bodyDraft}
+              />
+            </label>
+          ) : (
+            <button
+              className="detail-markdown__previewButton"
               disabled={!canEditBody}
-              onBlur={(event) => commitCardBody(event.target.value)}
-              onChange={(event) => setBodyDraft(event.target.value)}
-              placeholder={
-                expanded
-                  ? "ここに本文を書いてください。必要なら Markdown 記法もそのまま使えます。"
-                  : "ここに本文を書いてください"
-              }
-              ref={bodyTextareaRef}
-              value={bodyDraft}
-            />
-          </label>
-          <div className="detail-markdown__preview">
-            <span>Markdown プレビュー</span>
-            <div
-              className={expanded ? "markdown-surface markdown-surface--page" : "markdown-surface"}
+              onClick={() => setIsBodyExpanded(true)}
+              type="button"
             >
-              {renderMarkdownDocument(bodyDraft)}
-            </div>
-          </div>
+              <div className="detail-markdown__preview">
+                <span>Markdown プレビュー</span>
+                <div className="markdown-surface">{renderMarkdownDocument(bodyDraft)}</div>
+              </div>
+            </button>
+          )}
         </div>
       </section>
     );
@@ -1839,8 +1854,26 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       </section>
 
       {selectedCard && isBodyExpanded ? (
-        <div className="overlay overlay--page" role="presentation">
-          <dialog aria-modal="true" className="modal modal--page" open>
+        <div
+          className="overlay overlay--page"
+          onClick={() => setIsBodyExpanded(false)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              setIsBodyExpanded(false);
+            }
+          }}
+          role="presentation"
+        >
+          <dialog
+            aria-modal="true"
+            className="modal modal--page"
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              event.stopPropagation();
+            }}
+            open
+          >
             {renderBodySection(true)}
           </dialog>
         </div>
