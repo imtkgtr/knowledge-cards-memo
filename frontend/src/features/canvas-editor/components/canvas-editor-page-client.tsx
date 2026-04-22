@@ -63,7 +63,16 @@ const nodeTypes: NodeTypes = {
 function ToolGlyph({
   kind,
 }: {
-  kind: "add" | "branch" | "lock" | "unlock" | "close" | "panel";
+  kind:
+    | "add"
+    | "branch"
+    | "lock"
+    | "unlock"
+    | "close"
+    | "panel"
+    | "delete"
+    | "chevronLeft"
+    | "chevronRight";
 }) {
   const common = {
     fill: "none",
@@ -114,6 +123,17 @@ function ToolGlyph({
           <path {...common} d="M10 5v14" />
         </>
       ) : null}
+      {kind === "delete" ? (
+        <>
+          <path {...common} d="M5 7h14" />
+          <path {...common} d="M9 7V5h6v2" />
+          <path {...common} d="M8 7l1 12h6l1-12" />
+          <path {...common} d="M10 11v5" />
+          <path {...common} d="M14 11v5" />
+        </>
+      ) : null}
+      {kind === "chevronLeft" ? <path {...common} d="M14.5 6.5L8.5 12l6 5.5" /> : null}
+      {kind === "chevronRight" ? <path {...common} d="M9.5 6.5l6 5.5-6 5.5" /> : null}
     </svg>
   );
 }
@@ -470,6 +490,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       (document?.cards ?? []).some((card) => selectedCardIds.includes(card.id) && card.isLocked),
     [document?.cards, selectedCardIds],
   );
+  const canDeleteSelection = selectedCardIds.length > 0 && !lockedSelected;
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) {
@@ -863,6 +884,14 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       return;
     }
     setInteractionMessage(createdCardId ? "カードを追加しました。" : null);
+  }
+
+  function handleDeleteSelection() {
+    if (!canDeleteSelection) {
+      return;
+    }
+    bulkDeleteCards(selectedCardIds);
+    setInteractionMessage(`${selectedCardIds.length} 件のカードを削除しました。`);
   }
 
   async function syncCanvasThumbnail(accessToken: string, isAutoSave: boolean) {
@@ -1380,69 +1409,139 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             {document?.cards.length ?? 0} cards / {saveStatusLabel}
           </p>
         </div>
-        <div className="editor-topbar__actions">
-          <div className="search-panel">
-            <input
-              className="input search-panel__input"
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="検索"
-              value={searchQuery}
-            />
-            {searchQuery.trim() ? (
-              <div className="search-panel__results">
-                {searchResults.length > 0 ? (
-                  searchResults.map((card) => (
+        <div className="editor-topbar__side">
+          <div className="editor-topbar__searchRow">
+            <div className="search-panel">
+              <input
+                className="input search-panel__input"
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="検索"
+                value={searchQuery}
+              />
+              {searchQuery.trim() ? (
+                <div className="search-panel__results">
+                  {searchResults.length > 0 ? (
+                    searchResults.map((card) => (
+                      <button
+                        className="search-result"
+                        key={card.id}
+                        onClick={() => handleSearchResultClick(card.id)}
+                        type="button"
+                      >
+                        <strong>{card.title}</strong>
+                        <span>{card.body.slice(0, 80) || "本文なし"}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="muted search-panel__empty">一致するカードはありません。</p>
+                  )}
+                </div>
+              ) : null}
+            </div>
+            {availableTags.length > 0 ? (
+              <div className="editor-topbar__filters">
+                <div className="editor-topbar__filterGroup">
+                  <span>強調</span>
+                  <div className="tag-chip-list">
                     <button
-                      className="search-result"
-                      key={card.id}
-                      onClick={() => handleSearchResultClick(card.id)}
+                      className={!activeHighlightTag ? "tag-chip tag-chip--active" : "tag-chip"}
+                      onClick={() => setActiveHighlightTag(null)}
                       type="button"
                     >
-                      <strong>{card.title}</strong>
-                      <span>{card.body.slice(0, 80) || "本文なし"}</span>
+                      なし
                     </button>
-                  ))
-                ) : (
-                  <p className="muted search-panel__empty">一致するカードはありません。</p>
-                )}
+                    {availableTags.map((tag) => (
+                      <button
+                        className={
+                          activeHighlightTag === tag ? "tag-chip tag-chip--active" : "tag-chip"
+                        }
+                        key={`highlight-${tag}`}
+                        onClick={() =>
+                          setActiveHighlightTag((current) => (current === tag ? null : tag))
+                        }
+                        type="button"
+                      >
+                        #{tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="editor-topbar__filterGroup">
+                  <span>絞り込み</span>
+                  <div className="tag-chip-list">
+                    <button
+                      className={!activeFilterTag ? "tag-chip tag-chip--active" : "tag-chip"}
+                      onClick={() => setActiveFilterTag(null)}
+                      type="button"
+                    >
+                      すべて
+                    </button>
+                    {availableTags.map((tag) => (
+                      <button
+                        className={
+                          activeFilterTag === tag ? "tag-chip tag-chip--active" : "tag-chip"
+                        }
+                        key={`filter-${tag}`}
+                        onClick={() =>
+                          setActiveFilterTag((current) => (current === tag ? null : tag))
+                        }
+                        type="button"
+                      >
+                        #{tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : null}
           </div>
-          <button className="button button--ghost" disabled={!canUndo} onClick={undo} type="button">
-            Undo
-          </button>
-          <button className="button button--ghost" disabled={!canRedo} onClick={redo} type="button">
-            Redo
-          </button>
-          <button
-            className={isCreateModalOpen ? "button button--accent" : "button button--ghost"}
-            onClick={() => setIsCreateModalOpen(true)}
-            type="button"
-          >
-            カードを追加
-          </button>
-          <button className="button button--ghost" onClick={handleAutoLayout} type="button">
-            整列
-          </button>
-          <button
-            className={isDetailHidden ? "button button--accent" : "button button--ghost"}
-            onClick={() => setIsDetailHidden((current) => !current)}
-            type="button"
-          >
-            {isDetailHidden ? "詳細を表示" : "詳細を隠す"}
-          </button>
-          <button
-            className="button button--accent"
-            onClick={() => {
-              void handleSave();
-            }}
-            type="button"
-          >
-            {isPending || saveState === "saving" ? "保存中..." : "保存"}
-          </button>
-          <Link className="button button--ghost" href="/canvases">
-            一覧へ戻る
-          </Link>
+          <div className="editor-topbar__actions">
+            <button
+              className="button button--ghost"
+              disabled={!canUndo}
+              onClick={undo}
+              type="button"
+            >
+              Undo
+            </button>
+            <button
+              className="button button--ghost"
+              disabled={!canRedo}
+              onClick={redo}
+              type="button"
+            >
+              Redo
+            </button>
+            <button
+              className={isCreateModalOpen ? "button button--accent" : "button button--ghost"}
+              onClick={() => setIsCreateModalOpen(true)}
+              type="button"
+            >
+              カードを追加
+            </button>
+            <button className="button button--ghost" onClick={handleAutoLayout} type="button">
+              整列
+            </button>
+            <button
+              className={isDetailHidden ? "button button--accent" : "button button--ghost"}
+              onClick={() => setIsDetailHidden((current) => !current)}
+              type="button"
+            >
+              {isDetailHidden ? "詳細を表示" : "詳細を隠す"}
+            </button>
+            <button
+              className="button button--accent"
+              onClick={() => {
+                void handleSave();
+              }}
+              type="button"
+            >
+              {isPending || saveState === "saving" ? "保存中..." : "保存"}
+            </button>
+            <Link className="button button--ghost" href="/canvases">
+              一覧へ戻る
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -1492,55 +1591,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       {saveError ? <p className="notice notice--error">{saveError}</p> : null}
       {interactionMessage ? <p className="notice notice--success">{interactionMessage}</p> : null}
 
-      {availableTags.length > 0 ? (
-        <section className="editor-filterbar">
-          <div className="editor-filterbar__group">
-            <span>強調</span>
-            <div className="tag-chip-list">
-              <button
-                className={!activeHighlightTag ? "tag-chip tag-chip--active" : "tag-chip"}
-                onClick={() => setActiveHighlightTag(null)}
-                type="button"
-              >
-                なし
-              </button>
-              {availableTags.map((tag) => (
-                <button
-                  className={activeHighlightTag === tag ? "tag-chip tag-chip--active" : "tag-chip"}
-                  key={`highlight-${tag}`}
-                  onClick={() => setActiveHighlightTag((current) => (current === tag ? null : tag))}
-                  type="button"
-                >
-                  #{tag}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="editor-filterbar__group">
-            <span>絞り込み</span>
-            <div className="tag-chip-list">
-              <button
-                className={!activeFilterTag ? "tag-chip tag-chip--active" : "tag-chip"}
-                onClick={() => setActiveFilterTag(null)}
-                type="button"
-              >
-                すべて
-              </button>
-              {availableTags.map((tag) => (
-                <button
-                  className={activeFilterTag === tag ? "tag-chip tag-chip--active" : "tag-chip"}
-                  key={`filter-${tag}`}
-                  onClick={() => setActiveFilterTag((current) => (current === tag ? null : tag))}
-                  type="button"
-                >
-                  #{tag}
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-      ) : null}
-
       <section
         className="editor-layout"
         style={{
@@ -1556,70 +1606,73 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               onPointerDown={(event) => handlePanelEdgePointerDown("palette", event)}
               style={{ width: paletteWidth }}
             >
-              <div className="editor-palette__floatingActions">
-                <button
-                  aria-label="カードを追加"
-                  className={
-                    isCreateModalOpen
-                      ? "editor-toolButton editor-toolButton--active"
-                      : "editor-toolButton"
-                  }
-                  onClick={() => setIsCreateModalOpen(true)}
-                  title="カードを追加"
-                  type="button"
-                >
-                  <ToolGlyph kind="add" />
-                </button>
-                <button
-                  aria-label="階層リンク"
-                  className={
-                    activeMode === "addHierarchyLink"
-                      ? "editor-toolButton editor-toolButton--active"
-                      : "editor-toolButton"
-                  }
-                  onClick={() => toggleMode("addHierarchyLink")}
-                  title="階層リンク"
-                  type="button"
-                >
-                  <ToolGlyph kind="branch" />
-                </button>
-                <button
-                  aria-label={selectedCard?.isLocked ? "ロック解除" : "ロック"}
-                  className="editor-toolButton"
-                  disabled={!selectedCardId}
-                  onClick={() => selectedCardId && toggleCardLock(selectedCardId)}
-                  title={selectedCard?.isLocked ? "ロック解除" : "ロック"}
-                  type="button"
-                >
-                  <ToolGlyph kind={selectedCard?.isLocked ? "unlock" : "lock"} />
-                </button>
-                <button
-                  aria-label="ツールを隠す"
-                  className="editor-toolButton"
-                  onClick={() => setIsPaletteHidden(true)}
-                  title="ツールを隠す"
-                  type="button"
-                >
-                  <ToolGlyph kind="close" />
-                </button>
-              </div>
-              <div className="editor-palette__floatingColors">
-                {colorChoices.map((color) => (
+              <div className="editor-palette__floatingMain">
+                <div className="editor-palette__floatingActions">
                   <button
-                    aria-label={`色 ${color}`}
+                    aria-label="カードを追加"
                     className={
-                      nextCardColor === color ? "color-chip color-chip--active" : "color-chip"
+                      isCreateModalOpen
+                        ? "editor-toolButton editor-toolButton--active"
+                        : "editor-toolButton"
                     }
-                    key={color}
-                    onClick={() =>
-                      selectedCardIds.length > 1
-                        ? bulkSetColor(selectedCardIds, color)
-                        : setNextCardColor(color)
-                    }
-                    style={{ backgroundColor: color }}
+                    onClick={() => setIsCreateModalOpen(true)}
+                    title="カードを追加"
                     type="button"
-                  />
-                ))}
+                  >
+                    <ToolGlyph kind="add" />
+                  </button>
+                  <button
+                    aria-label="階層リンク"
+                    className={
+                      activeMode === "addHierarchyLink"
+                        ? "editor-toolButton editor-toolButton--active"
+                        : "editor-toolButton"
+                    }
+                    onClick={() => toggleMode("addHierarchyLink")}
+                    title="階層リンク"
+                    type="button"
+                  >
+                    <ToolGlyph kind="branch" />
+                  </button>
+                  <button
+                    aria-label={selectedCard?.isLocked ? "ロック解除" : "ロック"}
+                    className="editor-toolButton"
+                    disabled={!selectedCardId}
+                    onClick={() => selectedCardId && toggleCardLock(selectedCardId)}
+                    title={selectedCard?.isLocked ? "ロック解除" : "ロック"}
+                    type="button"
+                  >
+                    <ToolGlyph kind={selectedCard?.isLocked ? "unlock" : "lock"} />
+                  </button>
+                  <button
+                    aria-label="削除"
+                    className="editor-toolButton editor-toolButton--danger"
+                    disabled={!canDeleteSelection}
+                    onClick={handleDeleteSelection}
+                    title="削除"
+                    type="button"
+                  >
+                    <ToolGlyph kind="delete" />
+                  </button>
+                </div>
+                <div className="editor-palette__floatingColors">
+                  {colorChoices.map((color) => (
+                    <button
+                      aria-label={`色 ${color}`}
+                      className={
+                        nextCardColor === color ? "color-chip color-chip--active" : "color-chip"
+                      }
+                      key={color}
+                      onClick={() =>
+                        selectedCardIds.length > 1
+                          ? bulkSetColor(selectedCardIds, color)
+                          : setNextCardColor(color)
+                      }
+                      style={{ backgroundColor: color }}
+                      type="button"
+                    />
+                  ))}
+                </div>
               </div>
               {activeMode === "addHierarchyLink" ? (
                 <p className="muted editor-palette__hint">
@@ -1629,6 +1682,15 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                     : "カードを選択"}
                 </p>
               ) : null}
+              <button
+                aria-label="ツールを隠す"
+                className="editor-palette__collapse"
+                onClick={() => setIsPaletteHidden(true)}
+                title="ツールを隠す"
+                type="button"
+              >
+                <ToolGlyph kind="chevronLeft" />
+              </button>
             </aside>
           ) : (
             <button
@@ -1638,7 +1700,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               title="ツールを表示"
               type="button"
             >
-              <ToolGlyph kind="panel" />
+              <ToolGlyph kind="chevronRight" />
             </button>
           )}
           <ReactFlow<KnowledgeCardNode, Edge>

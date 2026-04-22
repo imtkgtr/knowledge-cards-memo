@@ -235,17 +235,51 @@ select {
   font-weight: 700;
 }
 
+.editor-topbar__side {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 720px;
+}
+
+.editor-topbar__searchRow,
 .editor-topbar__actions {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 12px;
 }
 
+.editor-topbar__searchRow {
+  align-items: flex-start;
+}
+
+.editor-topbar__filters {
+  display: flex;
+  flex: 1 1 320px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+
+.editor-topbar__filterGroup {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.editor-topbar__filterGroup > span {
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .search-panel {
   position: relative;
-  width: 280px;
+  width: min(320px, 100%);
+  min-width: min(320px, 100%);
 }
 
 .search-panel__input {
@@ -312,7 +346,6 @@ select {
   gap: 10px;
 }
 
-.editor-filterbar,
 .editor-palette,
 .editor-detail {
   position: relative;
@@ -321,35 +354,16 @@ select {
   box-shadow: var(--shadow);
 }
 
-.editor-filterbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: 20px;
-}
-
-.editor-filterbar__group {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
-.editor-filterbar__group > span {
-  color: var(--text);
-  font-size: 0.88rem;
-  font-weight: 700;
-}
-
 .editor-palette {
   display: grid;
   align-content: start;
   gap: 12px;
-  padding: 12px 10px 12px 12px;
+  padding: 12px 12px 10px;
   border-radius: 22px;
 }
 
 .editor-palette__hint {
+  margin: 0;
   font-size: 0.9rem;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -364,8 +378,15 @@ select {
   backdrop-filter: blur(12px);
 }
 
-.editor-palette__floatingActions {
+.editor-palette__floatingMain {
   display: grid;
+  gap: 10px;
+}
+
+.editor-palette__floatingActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -396,6 +417,7 @@ select {
 .editor-panelToggle--palette {
   top: 16px;
   left: 16px;
+  border-radius: 999px;
 }
 
 .editor-toolButton {
@@ -429,9 +451,32 @@ select {
   color: #f7fbfc;
 }
 
+.editor-toolButton--danger {
+  color: var(--danger);
+}
+
+.editor-toolButton--danger:disabled {
+  color: var(--muted);
+}
+
 .editor-toolIcon {
   width: 20px;
   height: 20px;
+}
+
+.editor-palette__collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  width: 44px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--muted);
+  cursor: pointer;
 }
 
 .tag-chip-list {
@@ -974,8 +1019,16 @@ select {
   .auth-actions,
   .dashboard-header__actions,
   .editor-topbar,
-  .editor-topbar__actions {
+  .editor-topbar__searchRow,
+  .editor-topbar__actions,
+  .editor-topbar__filters {
     flex-direction: column;
+  }
+
+  .editor-topbar__side,
+  .search-panel {
+    width: 100%;
+    min-width: 0;
   }
 
   .editor-placeholder {
