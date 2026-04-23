@@ -86,8 +86,7 @@ test("ログインしてキャンバス作成とカード追加まで進める",
   await page.getByRole("button", { name: "作成する" }).click();
 
   await expect(page.getByText(cardTitle).first()).toBeVisible();
-  await expect(page.getByLabel("本文ページ編集")).toBeVisible();
-  await page.getByRole("button", { name: "閉じる" }).click();
+  await expect(page.getByLabel("本文編集")).toHaveCount(0);
   await page.getByRole("button", { name: "カードを追加" }).first().click();
   await page.getByLabel("タイトル").fill(cardTitle);
   await page.getByRole("button", { name: "作成する" }).click();
@@ -102,22 +101,18 @@ test("ログインしてキャンバス作成とカード追加まで進める",
   await expect(page.getByRole("heading", { name: "同じ名前のカードがあります" })).toHaveCount(0);
 
   await expect(page.getByRole("heading", { name: "カード" })).toBeVisible();
-  await page.getByRole("button", { name: "編集" }).click();
-  await expect(page.getByLabel("本文ページ編集")).toBeVisible();
-  await page.getByRole("button", { name: "分割" }).click();
+  await page.getByRole("button", { name: "プレビュー" }).click();
   await expect(page.getByText("本文プレビュー")).toBeVisible();
   await expect(page.getByText("本文を編集")).toBeVisible();
-  await page.getByRole("button", { name: "プレビュー" }).click();
-  await expect(page.getByText("本文ページ編集")).toHaveCount(0);
   await page.getByRole("button", { name: "編集" }).click();
-  await expect(page.getByLabel("本文ページ編集")).toBeVisible();
-  await page.getByLabel("本文ページ編集").fill(markdownBody);
+  await expect(page.getByLabel("本文編集")).toBeVisible();
+  await page.getByLabel("本文編集").fill(markdownBody);
   await page.getByRole("button", { name: "閉じる" }).click();
 
   const preview = page.locator(".detail-markdown__preview");
   await expect(preview.getByText("見出し")).toBeVisible();
   await expect(preview.locator("li")).toHaveCount(2);
-  await expect(page.locator(".react-flow__node", { hasText: "箇条書き1" })).toHaveCount(1);
+  await expect(page.locator(".react-flow__node", { hasText: "箇条書き1" })).toHaveCount(0);
 
   const canvasNode = page.locator(".react-flow__node", { hasText: cardTitle });
   await expect(canvasNode).toHaveCount(1);

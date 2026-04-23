@@ -49,7 +49,7 @@ type CanvasEditorPageClientProps = {
   initialDocument: CanvasDocument;
 };
 
-type BodyViewMode = "edit" | "preview" | "split";
+type BodyViewMode = "edit" | "split";
 
 const colorChoices = ["#eed9b6", "#cfe5e7", "#f4d8d8", "#dceac8", "#efe0ff"];
 const panelResizeHitArea = 14;
@@ -179,50 +179,6 @@ function parseTagInput(value: string) {
       .split(",")
       .map((item) => item.trim().replace(/^#/, "")),
   );
-}
-
-function extractAutoCardTitles(markdown: string) {
-  const titles = markdown
-    .replace(/\r/g, "")
-    .split("\n")
-    .map((line) => line.trim())
-    .flatMap((line) => {
-      if (!line) {
-        return [];
-      }
-
-      const checklistMatch = line.match(/^[-*]\s+\[[ xX]\]\s+(.+)$/);
-      if (checklistMatch) {
-        return [checklistMatch[1]];
-      }
-
-      const bulletMatch = line.match(/^[-*]\s+(.+)$/);
-      if (bulletMatch) {
-        return [bulletMatch[1]];
-      }
-
-      const orderedMatch = line.match(/^\d+\.\s+(.+)$/);
-      if (orderedMatch) {
-        return [orderedMatch[1]];
-      }
-
-      const headingMatch = line.match(/^#{2,3}\s+(.+)$/);
-      if (headingMatch) {
-        return [headingMatch[1]];
-      }
-
-      return [];
-    })
-    .map((item) =>
-      item
-        .replace(/[*_`#]+/g, "")
-        .replace(/\[(.*?)\]\(.*?\)/g, "$1")
-        .replace(/\s+/g, " ")
-        .trim(),
-    )
-    .filter(Boolean);
-
-  return Array.from(new Set(titles));
 }
 
 function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
@@ -448,7 +404,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const selectCard = useCanvasEditorStore((state) => state.selectCard);
   const setSelectedCardIds = useCanvasEditorStore((state) => state.setSelectedCardIds);
   const createCard = useCanvasEditorStore((state) => state.createCard);
-  const createCardsFromBody = useCanvasEditorStore((state) => state.createCardsFromBody);
   const updateCard = useCanvasEditorStore((state) => state.updateCard);
   const moveCard = useCanvasEditorStore((state) => state.moveCard);
   const addHierarchyLink = useCanvasEditorStore((state) => state.addHierarchyLink);
@@ -503,6 +458,16 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     () => new Set(visibleCards.map((card) => card.id)),
     [visibleCards],
   );
+  const childCountByCardId = useMemo(() => {
+    const countByCardId = new Map<string, number>();
+    for (const card of document?.cards ?? []) {
+      countByCardId.set(card.id, 0);
+    }
+    for (const link of document?.hierarchyLinks ?? []) {
+      countByCardId.set(link.parentCardId, (countByCardId.get(link.parentCardId) ?? 0) + 1);
+    }
+    return countByCardId;
+  }, [document?.cards, document?.hierarchyLinks]);
 
   const nodesFromDocument = useMemo<KnowledgeCardNode[]>(
     () =>
@@ -518,11 +483,11 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           isHighlighted: Boolean(activeHighlightTag && card.tagNames.includes(activeHighlightTag)),
           isDimmed: Boolean(activeHighlightTag && !card.tagNames.includes(activeHighlightTag)),
           isLocked: card.isLocked,
-          childCount: card.childCount,
+          childCount: childCountByCardId.get(card.id) ?? card.childCount,
           tagSummary: card.tagNames.slice(0, 2).join(", "),
         },
       })),
-    [activeHighlightTag, visibleCards],
+    [activeHighlightTag, childCountByCardId, visibleCards],
   );
   const [flowNodes, setFlowNodes] = useNodesState<KnowledgeCardNode>(nodesFromDocument);
 
@@ -970,8 +935,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     setPendingDuplicateTitle(null);
     if (createdCardId) {
       setIsDetailHidden(false);
-      setBodyViewMode("edit");
-      setIsBodyExpanded(true);
     }
     if (activeFilterTag) {
       setActiveFilterTag(null);
@@ -1445,26 +1408,11 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     }
   }
 
-  function syncCardsFromBody(markdown: string) {
-    if (!selectedCard) {
-      return;
-    }
-    const titles = extractAutoCardTitles(markdown);
-    if (titles.length === 0) {
-      return;
-    }
-    const createdCount = createCardsFromBody(selectedCard.id, titles);
-    if (createdCount > 0) {
-      setInteractionMessage(`本文から ${createdCount} 件のカードを追加しました。`);
-    }
-  }
-
   function handleBodyEditComplete(value: string) {
     if (selectedCard && value === selectedCard.body) {
       return;
     }
     commitCardBody(value);
-    syncCardsFromBody(value);
   }
 
   function startPanelResize(target: "palette" | "detail", clientX: number) {
@@ -1605,8 +1553,8 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
 
   function renderBodySection(expanded = false) {
     const canEditBody = Boolean(selectedCard && !selectedCard.isLocked);
-    const shouldShowEditor = expanded && bodyViewMode !== "preview";
-    const shouldShowPreview = !expanded || bodyViewMode !== "edit";
+    const shouldShowEditor = expanded;
+    const shouldShowPreview = !expanded || bodyViewMode === "split";
 
     return (
       <section
@@ -1615,7 +1563,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         <div className="detail-markdown__header">
           <div>
             <h3>本文</h3>
-            <p className="muted detail-markdown__note">箇条書きや見出しは子カードへ反映します。</p>
+            <p className="muted detail-markdown__note">Markdown として表示できます。</p>
           </div>
           <div className="detail-markdown__actions">
             {expanded ? (
@@ -1636,15 +1584,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                   onClick={() => setBodyViewMode("split")}
                   type="button"
                 >
-                  分割
-                </button>
-                <button
-                  className={
-                    bodyViewMode === "preview" ? "button button--accent" : "button button--ghost"
-                  }
-                  onClick={() => setBodyViewMode("preview")}
-                  type="button"
-                >
                   プレビュー
                 </button>
                 <button
@@ -1659,12 +1598,12 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               <button
                 className="button button--ghost"
                 onClick={() => {
-                  setBodyViewMode("edit");
+                  setBodyViewMode("split");
                   setIsBodyExpanded(true);
                 }}
                 type="button"
               >
-                編集
+                プレビュー
               </button>
             )}
           </div>
@@ -1678,7 +1617,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         >
           {shouldShowEditor ? (
             <label className="field">
-              <span>{bodyViewMode === "split" ? "本文を編集" : "本文ページ編集"}</span>
+              <span>{bodyViewMode === "split" ? "本文を編集" : "本文編集"}</span>
               <textarea
                 className="textarea textarea--page"
                 disabled={!canEditBody}
@@ -1695,7 +1634,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               className="detail-markdown__previewButton"
               disabled={!canEditBody}
               onClick={() => {
-                setBodyViewMode("edit");
+                setBodyViewMode("split");
                 setIsBodyExpanded(true);
               }}
               type="button"

@@ -686,6 +686,20 @@
 - 次のアクション:
   必要になった段階で、競合比較表や差別化メッセージの形に展開する。
 
+## 2026-04-23 19:04
+- 変更内容:
+  新規カード作成後に本文編集モーダルを自動で開く挙動をやめ、本文の通常表示はプレビュー中心へ戻した。本文プレビューを押した場合は、本文編集欄と Markdown プレビューを並べて表示する形に変更した。本文 blur 時に見出しや箇条書きから子カードを自動生成する処理と store action を削除した。あわせて、カードの子リンク数は保存済みの `childCount` ではなく現在の hierarchyLinks から再計算し、子リンク数に応じてカードの幅と高さが明確に大きくなるようにした。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
+- 目的:
+  カードを開いた直後に本文編集へ強制遷移しないようにし、本文は必要なときだけ編集できる状態へ戻すため。また、自動カード化を止め、親カードの重要度を子リンク数の見た目で分かりやすくするため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/stores/use-canvas-editor-store.ts`、`frontend/src/app/globals.css`、`frontend/tests/e2e/canvas-editor-smoke.spec.ts`、`progress.md`
+- 未解決事項:
+  なし。
+- 次のアクション:
+  この本文編集 UX とカードサイズ反映の修正をコミットして push する。
+
 ## 2026-04-23 18:57
 - 変更内容:
   左上フローティングパネルの収納ボタンを、パネル幅に関係なく常に左向き矢印で表示するようにした。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。

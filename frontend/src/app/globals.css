@@ -908,7 +908,9 @@ select {
 .card-node {
   --card-node-child-weight: 0;
   min-width: 180px;
-  max-width: calc(240px + var(--card-node-child-weight) * 8px);
+  width: calc(190px + var(--card-node-child-weight) * 18px);
+  min-height: calc(86px + var(--card-node-child-weight) * 6px);
+  max-width: 320px;
   padding: calc(14px + var(--card-node-child-weight) * 1px);
   border: 1px solid rgba(31, 26, 19, 0.15);
   border-radius: 12px;

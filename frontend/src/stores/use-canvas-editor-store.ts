@@ -49,7 +49,6 @@ type CanvasEditorState = {
   bulkSetColor: (cardIds: string[], color: string) => void;
   bulkToggleLock: (cardIds: string[], isLocked: boolean) => void;
   createCard: (input: { body?: string; title: string; x: number; y: number }) => string | null;
-  createCardsFromBody: (parentCardId: string, titles: string[]) => number;
   loadDocument: (document: CanvasDocument) => void;
   markSaved: (savedAt?: string | null) => void;
   moveCard: (cardId: string, x: number, y: number) => void;
@@ -452,75 +451,6 @@ export const useCanvasEditorStore = create<CanvasEditorState>((set, get) => {
         selectedCardIds: [cardId],
       });
       return cardId;
-    },
-    createCardsFromBody: (parentCardId, titles) => {
-      const createdCardIds: string[] = [];
-      const normalizedTitles = Array.from(
-        new Set(titles.map((title) => title.trim()).filter(Boolean)),
-      );
-
-      if (normalizedTitles.length === 0) {
-        return 0;
-      }
-
-      const didCreate = updateDocument("本文からカード追加", (draft) => {
-        const parentCard = draft.cards.find((card) => card.id === parentCardId);
-        if (!parentCard || parentCard.isLocked) {
-          return;
-        }
-
-        const existingChildIds = new Set(
-          draft.hierarchyLinks
-            .filter((link) => link.parentCardId === parentCardId)
-            .map((link) => link.childCardId),
-        );
-        const existingChildTitles = new Set(
-          draft.cards
-            .filter((card) => existingChildIds.has(card.id))
-            .map((card) => card.title.trim().toLowerCase()),
-        );
-
-        const now = getNow();
-        for (const [index, title] of normalizedTitles.entries()) {
-          const titleKey = title.toLowerCase();
-          if (existingChildTitles.has(titleKey)) {
-            continue;
-          }
-
-          const cardId = randomUuid();
-          createdCardIds.push(cardId);
-          existingChildTitles.add(titleKey);
-
-          draft.cards.push({
-            id: cardId,
-            canvasId: draft.canvas.id,
-            title,
-            body: "",
-            tagNames: [],
-            color: get().nextCardColor,
-            isLocked: false,
-            x: parentCard.x + (index % 2) * 32,
-            y: parentCard.y + 220 + index * 150,
-            childCount: 0,
-            createdAt: now,
-            updatedAt: now,
-          });
-          draft.hierarchyLinks.push({
-            id: randomUuid(),
-            canvasId: draft.canvas.id,
-            parentCardId,
-            childCardId: cardId,
-            createdAt: now,
-          });
-        }
-
-        if (createdCardIds.length === 0) {
-          return;
-        }
-        recalculateChildCount(draft.cards, draft.hierarchyLinks);
-      });
-
-      return didCreate ? createdCardIds.length : 0;
     },
     loadDocument: (document) =>
       set({
