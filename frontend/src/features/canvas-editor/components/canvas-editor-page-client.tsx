@@ -452,7 +452,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const updateCard = useCanvasEditorStore((state) => state.updateCard);
   const moveCard = useCanvasEditorStore((state) => state.moveCard);
   const addHierarchyLink = useCanvasEditorStore((state) => state.addHierarchyLink);
-  const addRelatedLink = useCanvasEditorStore((state) => state.addRelatedLink);
   const appendAttachment = useCanvasEditorStore((state) => state.appendAttachment);
   const applyCardLayout = useCanvasEditorStore((state) => state.applyCardLayout);
   const removeHierarchyLink = useCanvasEditorStore((state) => state.removeHierarchyLink);
@@ -1235,7 +1234,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     }
   }
 
-  function toggleMode(mode: "addHierarchyLink" | "addRelatedLink") {
+  function toggleMode(mode: "addHierarchyLink") {
     if (activeMode === mode) {
       setActiveMode("idle");
       setPendingLinkSourceId(null);
@@ -1342,38 +1341,22 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
       setPendingLinkSourceId(sourceCardId);
     }
 
-    if (activeMode === "addHierarchyLink") {
-      const wasAdded = addHierarchyLink(sourceCardId, nodeId);
-      setPendingLinkSourceId(sourceCardId);
-      selectCard(sourceCardId);
-      setInteractionMessage(
-        wasAdded
-          ? "階層リンクを追加しました。起点は維持しています。"
-          : "階層リンクを追加できませんでした。重複、循環、ロック状態を確認してください。",
-      );
+    if (activeMode !== "addHierarchyLink") {
       return;
     }
 
-    const wasAdded = addRelatedLink(sourceCardId, nodeId);
+    const wasAdded = addHierarchyLink(sourceCardId, nodeId);
     setPendingLinkSourceId(sourceCardId);
     selectCard(sourceCardId);
     setInteractionMessage(
       wasAdded
-        ? "通常リンクを追加しました。起点は維持しています。"
-        : "通常リンクを追加できませんでした。重複またはロック状態を確認してください。",
+        ? "階層リンクを追加しました。起点は維持しています。"
+        : "階層リンクを追加できませんでした。重複、循環、ロック状態を確認してください。",
     );
   }
 
   function handleConnect(connection: Connection) {
     if (!connection.source || !connection.target) {
-      return;
-    }
-    if (activeMode === "idle") {
-      setInteractionMessage("左上でリンク種別を選んでから、カードの端子をドラッグしてください。");
-      return;
-    }
-    if (activeMode !== "addHierarchyLink" && activeMode !== "addRelatedLink") {
-      setInteractionMessage("リンクモード中のみ端子ドラッグで接続できます。");
       return;
     }
     if (connection.source === connection.target) {
@@ -1383,19 +1366,12 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
 
     selectCard(connection.source);
     setPendingLinkSourceId(connection.source);
-    const wasAdded =
-      activeMode === "addHierarchyLink"
-        ? addHierarchyLink(connection.source, connection.target)
-        : addRelatedLink(connection.source, connection.target);
+    const wasAdded = addHierarchyLink(connection.source, connection.target);
     setPendingLinkSourceId(connection.source);
     setInteractionMessage(
       wasAdded
-        ? activeMode === "addHierarchyLink"
-          ? "階層リンクを追加しました。起点は維持しています。"
-          : "通常リンクを追加しました。起点は維持しています。"
-        : activeMode === "addHierarchyLink"
-          ? "階層リンクを追加できませんでした。重複、循環、ロック状態を確認してください。"
-          : "通常リンクを追加できませんでした。重複またはロック状態を確認してください。",
+        ? "階層リンクを追加しました。起点は維持しています。"
+        : "階層リンクを追加できませんでした。重複、循環、ロック状態を確認してください。",
     );
   }
 
@@ -2107,12 +2083,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
               if (activeMode === "addHierarchyLink") {
                 setInteractionMessage(
                   "リンクモードを維持しています。起点または接続先を選択してください。",
-                );
-                return;
-              }
-              if (activeMode === "addRelatedLink") {
-                setInteractionMessage(
-                  "リンクモードを維持しています。接続先カードを選択してください。",
                 );
                 return;
               }

@@ -686,6 +686,20 @@
 - 次のアクション:
   必要になった段階で、競合比較表や差別化メッセージの形に展開する。
 
+## 2026-04-23 00:00
+- 変更内容:
+  React Flow のカード端子ドラッグ接続を、リンクモードやリンク種別選択に依存せず常に `source -> target` の階層リンクとして作成するように変更した。あわせて editor 側に残っていた通常リンク追加の文言分岐を削除し、端子接続時に「左上でリンク種別を選んでから」という案内が出ないようにした。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
+- 目的:
+  現在の UI ではリンク種別が上位下位のみであるため、端子をつないだ操作をそのまま親子リンク作成として扱い、余計なモード選択を不要にするため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`progress.md`
+- 未解決事項:
+  store と backend schema には通常リンクのデータ構造を残している。現時点では frontend の端子接続と表示導線からは通常リンクを作れない。
+- 次のアクション:
+  この端子接続改善をコミットして push し、必要なら通常リンクの内部 API / store を残すか縮退させるかを別タスクで整理する。
+
 ## 2026-04-22 16:35
 - 変更内容:
   一覧画面の JSON import を即時実行から確認モーダル付きに変更した。JSON を選んだらキャンバス名、カード数、リンク数を表示してから取り込みを確定するようにし、添付が含まれないことも明示した。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
