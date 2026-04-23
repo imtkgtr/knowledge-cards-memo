@@ -2046,7 +2046,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                 title="ツールを隠す"
                 type="button"
               >
-                <ToolGlyph kind={isPaletteWide ? "chevronDown" : "chevronLeft"} />
+                <ToolGlyph kind="chevronLeft" />
               </button>
             </aside>
           ) : (

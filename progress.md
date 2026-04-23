@@ -686,6 +686,20 @@
 - 次のアクション:
   必要になった段階で、競合比較表や差別化メッセージの形に展開する。
 
+## 2026-04-23 18:57
+- 変更内容:
+  左上フローティングパネルの収納ボタンを、パネル幅に関係なく常に左向き矢印で表示するようにした。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
+- 目的:
+  横長表示時に矢印の向きが変わって意図が分かりにくくなるのを避け、閉じる操作を一貫して左向きで示すため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`progress.md`
+- 未解決事項:
+  なし。
+- 次のアクション:
+  この UI 微修正をコミットして push する。
+
 ## 2026-04-23 00:00
 - 変更内容:
   React Flow のカード端子ドラッグ接続を、リンクモードやリンク種別選択に依存せず常に `source -> target` の階層リンクとして作成するように変更した。あわせて editor 側に残っていた通常リンク追加の文言分岐を削除し、端子接続時に「左上でリンク種別を選んでから」という案内が出ないようにした。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
