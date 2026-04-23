@@ -686,6 +686,20 @@
 - 次のアクション:
   必要になった段階で、競合比較表や差別化メッセージの形に展開する。
 
+## 2026-04-23 19:11
+- 変更内容:
+  JSON 取込の動作確認や大量データ投入テストに使えるサンプルとして、小学校算数 6 年間の内容を整理したキャンバス JSON を追加した。全体カード、1〜6年生カード、各学年 5 項目の単元カードで構成し、合計 37 cards / 36 hierarchyLinks の階層データにした。`python -m json.tool`、backend の `CanvasExportSchema.model_validate`、リンク参照チェックで検証した。
+- 目的:
+  実際にまとまった学習内容を一括投入したときのキャンバス表示、リンク表示、カードサイズ、タグ、検索の見え方を試せるようにするため。
+- 影響範囲:
+  `docs/`、`progress.md`
+- 関連ファイル:
+  `docs/samples/elementary_math_canvas_import.json`、`progress.md`
+- 未解決事項:
+  実 DB への import はユーザのログインセッションが必要なため、今回は取り込み用 JSON の作成と schema 検証まで行った。
+- 次のアクション:
+  アプリの一覧画面で `JSON取込` から `docs/samples/elementary_math_canvas_import.json` を選び、実際の表示密度と操作感を確認する。
+
 ## 2026-04-23 19:04
 - 変更内容:
   新規カード作成後に本文編集モーダルを自動で開く挙動をやめ、本文の通常表示はプレビュー中心へ戻した。本文プレビューを押した場合は、本文編集欄と Markdown プレビューを並べて表示する形に変更した。本文 blur 時に見出しや箇条書きから子カードを自動生成する処理と store action を削除した。あわせて、カードの子リンク数は保存済みの `childCount` ではなく現在の hierarchyLinks から再計算し、子リンク数に応じてカードの幅と高さが明確に大きくなるようにした。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
