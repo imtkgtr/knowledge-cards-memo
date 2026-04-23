@@ -686,6 +686,20 @@
 - 次のアクション:
   必要になった段階で、競合比較表や差別化メッセージの形に展開する。
 
+## 2026-04-23 19:17
+- 変更内容:
+  React Flow の `MiniMap` に明示的な class、位置、サイズ、z-index、背景、枠線を付け、editor 右下に常に見えるようにした。`pannable` / `zoomable` も有効化した。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
+- 目的:
+  最近のレイアウト調整後にミニマップが見えなくなっていたため、キャンバス全体の把握と移動補助を復帰させるため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/app/globals.css`、`progress.md`
+- 未解決事項:
+  なし。
+- 次のアクション:
+  この MiniMap 表示復帰をコミットして push する。
+
 ## 2026-04-23 19:11
 - 変更内容:
   JSON 取込の動作確認や大量データ投入テストに使えるサンプルとして、小学校算数 6 年間の内容を整理したキャンバス JSON を追加した。全体カード、1〜6年生カード、各学年 5 項目の単元カードで構成し、合計 37 cards / 36 hierarchyLinks の階層データにした。`python -m json.tool`、backend の `CanvasExportSchema.model_validate`、リンク参照チェックで検証した。

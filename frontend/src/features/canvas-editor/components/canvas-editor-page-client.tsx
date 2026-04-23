@@ -2043,7 +2043,15 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           >
             <Background gap={20} size={1} />
             <Controls />
-            <MiniMap />
+            <MiniMap
+              className="editor-minimap"
+              maskColor="rgba(31, 26, 19, 0.08)"
+              nodeBorderRadius={8}
+              nodeStrokeWidth={2}
+              pannable
+              position="bottom-right"
+              zoomable
+            />
           </ReactFlow>
         </div>
 
