@@ -677,16 +677,6 @@ select {
   gap: 14px;
 }
 
-.detail-markdown__workspace--split {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  align-items: start;
-}
-
-.detail-markdown__workspace--split .field,
-.detail-markdown__workspace--split .detail-markdown__previewButton {
-  min-width: 0;
-}
-
 .detail-markdown__previewButton {
   padding: 0;
   border: none;
@@ -1135,10 +1125,6 @@ select {
 
   .detail-markdown__header {
     flex-direction: column;
-  }
-
-  .detail-markdown__workspace--split {
-    grid-template-columns: 1fr;
   }
 
   .editor-palette {

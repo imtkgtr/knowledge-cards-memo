@@ -106,10 +106,6 @@ test("ログインしてキャンバス作成とカード追加まで進める",
   await preview.click();
   await expect(page.getByLabel("本文編集")).toBeVisible();
   await page.getByLabel("本文編集").fill(markdownBody);
-  await page.getByRole("button", { name: "プレビュー" }).click();
-  const modalPreview = page.locator(".dialog .detail-markdown__preview");
-  await expect(modalPreview.getByText("見出し")).toBeVisible();
-  await expect(modalPreview.locator("li")).toHaveCount(2);
   await page.getByRole("button", { name: "閉じる" }).click();
 
   await expect(preview.getByText("見出し")).toBeVisible();

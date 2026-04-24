@@ -49,8 +49,6 @@ type CanvasEditorPageClientProps = {
   initialDocument: CanvasDocument;
 };
 
-type BodyViewMode = "edit" | "split";
-
 const colorChoices = ["#eed9b6", "#cfe5e7", "#f4d8d8", "#dceac8", "#efe0ff"];
 const panelResizeHitArea = 14;
 const thumbnailAutoSyncIntervalMs = 60 * 1000;
@@ -362,7 +360,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<string, string>>({});
   const [isBodyExpanded, setIsBodyExpanded] = useState(false);
-  const [bodyViewMode, setBodyViewMode] = useState<BodyViewMode>("edit");
   const [isDetailHidden, setIsDetailHidden] = useState(false);
   const [isPaletteHidden, setIsPaletteHidden] = useState(false);
   const [paletteWidth, setPaletteWidth] = useState(240);
@@ -899,12 +896,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     });
     return () => window.cancelAnimationFrame(animationFrameId);
   }, [bodyDraft.length, isBodyExpanded]);
-
-  useEffect(() => {
-    if (!isBodyExpanded) {
-      setBodyViewMode("edit");
-    }
-  }, [isBodyExpanded]);
 
   function handleCreateCard(title: string) {
     const nextTitle = title.trim();
@@ -1565,8 +1556,8 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
 
   function renderBodySection(expanded = false) {
     const canEditBody = Boolean(selectedCard && !selectedCard.isLocked);
-    const shouldShowEditor = expanded && canEditBody;
-    const shouldShowPreview = !expanded || bodyViewMode === "split";
+    const shouldShowEditor = expanded;
+    const shouldShowPreview = !expanded;
 
     return (
       <section
@@ -1580,24 +1571,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             {expanded ? (
               <>
                 <button
-                  className={
-                    bodyViewMode === "edit" ? "button button--accent" : "button button--ghost"
-                  }
-                  onClick={() => setBodyViewMode("edit")}
-                  type="button"
-                >
-                  編集
-                </button>
-                <button
-                  className={
-                    bodyViewMode === "split" ? "button button--accent" : "button button--ghost"
-                  }
-                  onClick={() => setBodyViewMode("split")}
-                  type="button"
-                >
-                  プレビュー
-                </button>
-                <button
                   className="button button--ghost"
                   onClick={() => setIsBodyExpanded(false)}
                   type="button"
@@ -1608,13 +1581,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             ) : null}
           </div>
         </div>
-        <div
-          className={
-            expanded && bodyViewMode === "split"
-              ? "detail-markdown__workspace detail-markdown__workspace--split"
-              : "detail-markdown__workspace"
-          }
-        >
+        <div className="detail-markdown__workspace">
           {shouldShowEditor ? (
             <label className="field">
               <span className="sr-only">本文編集</span>
@@ -1634,7 +1601,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
             <button
               className="detail-markdown__previewButton"
               onClick={() => {
-                setBodyViewMode(canEditBody ? "edit" : "split");
                 setIsBodyExpanded(true);
               }}
               type="button"
