@@ -594,46 +594,35 @@ select {
   right: 18px;
   bottom: 18px;
   z-index: 21;
-  display: grid;
-  justify-items: end;
-  gap: 8px;
   pointer-events: none;
 }
 
-.editor-minimapTools {
-  display: flex;
-  gap: 6px;
-  padding: 6px;
-  border: 1px solid rgba(31, 26, 19, 0.12);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 24px rgba(41, 29, 10, 0.1);
-  pointer-events: auto;
+.editor-canvasControlsExtra {
+  margin: 0 0 170px 0;
 }
 
-.editor-minimapTool,
-.editor-minimapToggle {
+.editor-canvasControlButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 34px;
-  height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--text);
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  background: #fff;
+  color: #4d4d4d;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   cursor: pointer;
 }
 
-.editor-minimapTool:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.editor-canvasControlButton:hover {
+  background: #f4f4f4;
 }
 
-.editor-minimapToggle {
-  box-shadow: 0 10px 24px rgba(41, 29, 10, 0.1);
-  pointer-events: auto;
+.editor-canvasControlButton--active {
+  color: var(--accent);
+  background: #eef7f8;
 }
 
 .editor-detail {

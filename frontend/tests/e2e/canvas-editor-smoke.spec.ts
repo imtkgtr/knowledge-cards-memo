@@ -81,12 +81,6 @@ test("ログインしてキャンバス作成とカード追加まで進める",
   await expect(page.getByRole("button", { name: "カードを追加" }).first()).toBeVisible();
   const miniMap = page.locator(".editor-minimap");
   await expect(miniMap).toBeVisible();
-  const miniMapBefore = await miniMap.boundingBox();
-  await page.getByRole("button", { name: "ミニマップを大きくする" }).click();
-  const miniMapAfterExpand = await miniMap.boundingBox();
-  expect(miniMapBefore).not.toBeNull();
-  expect(miniMapAfterExpand).not.toBeNull();
-  expect(miniMapAfterExpand?.width ?? 0).toBeGreaterThan(miniMapBefore?.width ?? 0);
   await miniMap.click({ position: { x: 20, y: 20 } });
   await expect(page.getByText("ミニマップの位置へ移動しました。")).toBeVisible();
   await page.getByRole("button", { name: "ミニマップを隠す" }).click();

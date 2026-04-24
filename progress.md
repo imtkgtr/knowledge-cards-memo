@@ -1,5 +1,19 @@
 # progress.md
 
+## 2026-04-24 17:43
+- 変更内容:
+  ミニマップ操作を右下の重なり UI から外し、左下のキャンバス操作側へ地図アイコン 1 つで統合した。ミニマップの `拡大 / 縮小` 操作は削除し、表示中は右下にマップ本体だけを出し、アイコンで `表示 / 非表示` を切り替える構成へ整理した。smoke test も新しいトグル操作に合わせて更新し、確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
+- 目的:
+  右下でマップ本体と操作が重なって見づらい状態を解消し、キャンバス操作を左下へ集約して視認性を上げるため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/app/globals.css`、`frontend/tests/e2e/canvas-editor-smoke.spec.ts`、`progress.md`
+- 未解決事項:
+  左下コントロール群の全体密度や並び順はまだ調整余地がある。
+- 次のアクション:
+  この minimap 操作移設をコミットして push し、続けて topbar とカード見た目の整理を進める。
+
 ## 2026-04-24 17:32
 - 変更内容:
   キャンバス一覧のカードグリッドを固定幅寄りのレイアウトへ変更し、キャンバス数やタイトル長でカードサイズがばらつかないように調整した。カード本体はサムネイルと本文領域の高さを揃え、操作ボタンも 2 列グリッドにして見た目を安定させた。モバイル幅では 1 列表示へ戻るようにした。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
