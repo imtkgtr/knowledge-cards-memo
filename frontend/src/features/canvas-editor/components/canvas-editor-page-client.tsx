@@ -1553,7 +1553,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
 
   function renderBodySection(expanded = false) {
     const canEditBody = Boolean(selectedCard && !selectedCard.isLocked);
-    const shouldShowEditor = expanded;
+    const shouldShowEditor = expanded && canEditBody;
     const shouldShowPreview = !expanded || bodyViewMode === "split";
 
     return (
@@ -1563,7 +1563,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         <div className="detail-markdown__header">
           <div>
             <h3>本文</h3>
-            <p className="muted detail-markdown__note">Markdown として表示できます。</p>
           </div>
           <div className="detail-markdown__actions">
             {expanded ? (
@@ -1594,18 +1593,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                   閉じる
                 </button>
               </>
-            ) : (
-              <button
-                className="button button--ghost"
-                onClick={() => {
-                  setBodyViewMode("split");
-                  setIsBodyExpanded(true);
-                }}
-                type="button"
-              >
-                プレビュー
-              </button>
-            )}
+            ) : null}
           </div>
         </div>
         <div
@@ -1617,13 +1605,14 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
         >
           {shouldShowEditor ? (
             <label className="field">
-              <span>{bodyViewMode === "split" ? "本文を編集" : "本文編集"}</span>
+              <span className="sr-only">本文編集</span>
               <textarea
+                aria-label="本文編集"
                 className="textarea textarea--page"
                 disabled={!canEditBody}
                 onBlur={(event) => handleBodyEditComplete(event.target.value)}
                 onChange={(event) => setBodyDraft(event.target.value)}
-                placeholder="ここに本文を書いてください。必要なら Markdown 記法もそのまま使えます。"
+                placeholder="本文を書く"
                 ref={bodyTextareaRef}
                 value={bodyDraft}
               />
@@ -1632,15 +1621,13 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           {shouldShowPreview ? (
             <button
               className="detail-markdown__previewButton"
-              disabled={!canEditBody}
               onClick={() => {
-                setBodyViewMode("split");
+                setBodyViewMode(canEditBody ? "edit" : "split");
                 setIsBodyExpanded(true);
               }}
               type="button"
             >
               <div className="detail-markdown__preview">
-                <span>{expanded ? "本文プレビュー" : "Markdown プレビュー"}</span>
                 <div
                   className={
                     expanded ? "markdown-surface markdown-surface--page" : "markdown-surface"

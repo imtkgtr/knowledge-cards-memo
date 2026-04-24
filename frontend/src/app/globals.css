@@ -661,13 +661,8 @@ select {
 }
 
 .detail-markdown__header h3 {
-  margin: 0 0 4px;
-  font-size: 1rem;
-}
-
-.detail-markdown__note {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 1rem;
 }
 
 .detail-markdown__actions {
@@ -717,13 +712,7 @@ select {
 
 .detail-markdown__preview {
   display: grid;
-  gap: 8px;
   min-width: 0;
-}
-
-.detail-markdown__preview > span {
-  color: var(--muted);
-  font-size: 0.95rem;
 }
 
 .markdown-surface {

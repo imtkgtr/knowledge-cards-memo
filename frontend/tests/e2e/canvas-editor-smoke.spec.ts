@@ -101,15 +101,17 @@ test("ログインしてキャンバス作成とカード追加まで進める",
   await expect(page.getByRole("heading", { name: "同じ名前のカードがあります" })).toHaveCount(0);
 
   await expect(page.getByRole("heading", { name: "カード" })).toBeVisible();
-  await page.getByRole("button", { name: "プレビュー" }).click();
-  await expect(page.getByText("本文プレビュー")).toBeVisible();
-  await expect(page.getByText("本文を編集")).toBeVisible();
-  await page.getByRole("button", { name: "編集" }).click();
+  const preview = page.locator(".detail-markdown__preview").first();
+  await expect(preview.getByText("本文はまだありません。")).toBeVisible();
+  await preview.click();
   await expect(page.getByLabel("本文編集")).toBeVisible();
   await page.getByLabel("本文編集").fill(markdownBody);
+  await page.getByRole("button", { name: "プレビュー" }).click();
+  const modalPreview = page.locator(".dialog .detail-markdown__preview");
+  await expect(modalPreview.getByText("見出し")).toBeVisible();
+  await expect(modalPreview.locator("li")).toHaveCount(2);
   await page.getByRole("button", { name: "閉じる" }).click();
 
-  const preview = page.locator(".detail-markdown__preview");
   await expect(preview.getByText("見出し")).toBeVisible();
   await expect(preview.locator("li")).toHaveCount(2);
   await expect(page.locator(".react-flow__node", { hasText: "箇条書き1" })).toHaveCount(0);
