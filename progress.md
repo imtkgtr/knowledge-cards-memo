@@ -1,5 +1,19 @@
 # progress.md
 
+## 2026-04-24 17:18
+- 変更内容:
+  editor のミニマップにドック型の操作 UI を追加し、右下から `表示 / 非表示`、`拡大 / 縮小` を行えるようにした。あわせて、ミニマップの空き領域クリックでその座標へ移動し、ノードクリックで該当カードへ寄る挙動を追加した。smoke test にはミニマップの表示、サイズ変更、クリック移動、再表示の確認を加えた。確認は `cd frontend && bun run lint`、`cd frontend && bun run build` で行った。
+- 目的:
+  キャンバスが大きくなったときに全体把握と移動をミニマップ側でも完結できるようにし、常時表示が不要な場合は簡単に隠せるようにするため。
+- 影響範囲:
+  `frontend/`、`progress.md`
+- 関連ファイル:
+  `frontend/src/features/canvas-editor/components/canvas-editor-page-client.tsx`、`frontend/src/app/globals.css`、`frontend/tests/e2e/canvas-editor-smoke.spec.ts`、`progress.md`
+- 未解決事項:
+  Playwright smoke test は今回追加したミニマップ検証まで含めて更新したが、ローカル実行では `page.goto(\"/login\")` が `ERR_ABORTED` で止まり、今回の editor 変更箇所まで到達しなかった。実装差分の compile failure ではなく、既存のローカル E2E 実行環境の不安定さが残っている。
+- 次のアクション:
+  このミニマップ改善をコミットして push し、続けて topbar とカード見た目の整理を進める。
+
 ## 2026-04-24 16:57
 - 変更内容:
   カード本文の編集モーダルから Markdown プレビューを外し、編集に入ったあとはテキスト編集だけを行う構成へ整理した。本文の閲覧側プレビューはカード詳細に残しつつ、`split` 表示用の状態管理と対応テストを削減した。

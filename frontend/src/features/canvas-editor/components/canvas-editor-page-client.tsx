@@ -31,6 +31,7 @@ import { toBlob } from "html-to-image";
 import Link from "next/link";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
   useEffect,
@@ -49,6 +50,8 @@ type CanvasEditorPageClientProps = {
   initialDocument: CanvasDocument;
 };
 
+type MiniMapSize = "small" | "medium" | "large";
+
 const colorChoices = ["#eed9b6", "#cfe5e7", "#f4d8d8", "#dceac8", "#efe0ff"];
 const panelResizeHitArea = 14;
 const thumbnailAutoSyncIntervalMs = 60 * 1000;
@@ -58,6 +61,11 @@ const panelSizeLimits = {
   paletteMax: 520,
   paletteMin: 72,
 } as const;
+const miniMapDimensions: Record<MiniMapSize, { width: number; height: number }> = {
+  small: { width: 144, height: 96 },
+  medium: { width: 180, height: 120 },
+  large: { width: 240, height: 160 },
+};
 const nodeTypes: NodeTypes = {
   knowledgeCard: CardNode,
 };
@@ -362,6 +370,8 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   const [isBodyExpanded, setIsBodyExpanded] = useState(false);
   const [isDetailHidden, setIsDetailHidden] = useState(false);
   const [isPaletteHidden, setIsPaletteHidden] = useState(false);
+  const [isMiniMapHidden, setIsMiniMapHidden] = useState(false);
+  const [miniMapSize, setMiniMapSize] = useState<MiniMapSize>("medium");
   const [paletteWidth, setPaletteWidth] = useState(240);
   const [paintColor, setPaintColor] = useState<string | null>(null);
   const [detailWidth, setDetailWidth] = useState(360);
@@ -536,6 +546,7 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   }, [document?.cards, searchQuery]);
   const canUndo = historyIndex >= 0;
   const canRedo = historyIndex < history.length - 1;
+  const currentMiniMapDimensions = miniMapDimensions[miniMapSize];
   const paletteStatusLabel =
     activeMode === "addHierarchyLink"
       ? pendingLinkSourceId
@@ -1354,6 +1365,54 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
     setInteractionMessage(`「${card.title}」の位置へ移動しました。`);
   }
 
+  function handleMiniMapClick(_: ReactMouseEvent, position: { x: number; y: number }) {
+    if (!reactFlowInstance) {
+      return;
+    }
+    reactFlowInstance.setCenter(position.x, position.y, {
+      duration: 260,
+      zoom: reactFlowInstance.getZoom(),
+    });
+    setInteractionMessage("ミニマップの位置へ移動しました。");
+  }
+
+  function handleMiniMapNodeClick(_: ReactMouseEvent, node: KnowledgeCardNode) {
+    if (!reactFlowInstance || !document) {
+      return;
+    }
+    const card = document.cards.find((item) => item.id === node.id);
+    if (!card) {
+      return;
+    }
+    selectCard(card.id);
+    reactFlowInstance.setCenter(card.x + 120, card.y + 80, {
+      duration: 260,
+      zoom: Math.max(reactFlowInstance.getZoom(), 0.95),
+    });
+    setInteractionMessage(`「${card.title}」へ移動しました。`);
+  }
+
+  function adjustMiniMapSize(direction: "smaller" | "larger") {
+    setMiniMapSize((current) => {
+      if (direction === "smaller") {
+        if (current === "large") {
+          return "medium";
+        }
+        if (current === "medium") {
+          return "small";
+        }
+        return "small";
+      }
+      if (current === "small") {
+        return "medium";
+      }
+      if (current === "medium") {
+        return "large";
+      }
+      return "large";
+    });
+  }
+
   function handleAutoLayout() {
     if (!document || document.cards.length === 0) {
       return;
@@ -1994,15 +2053,62 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
           >
             <Background gap={20} size={1} />
             <Controls />
-            <MiniMap
-              className="editor-minimap"
-              maskColor="rgba(31, 26, 19, 0.08)"
-              nodeBorderRadius={8}
-              nodeStrokeWidth={2}
-              pannable
-              position="bottom-right"
-              zoomable
-            />
+            {isMiniMapHidden ? (
+              <div className="editor-minimapDock">
+                <button
+                  aria-label="ミニマップを表示"
+                  className="editor-minimapToggle"
+                  onClick={() => setIsMiniMapHidden(false)}
+                  type="button"
+                >
+                  地図
+                </button>
+              </div>
+            ) : (
+              <div className="editor-minimapDock">
+                <div className="editor-minimapTools">
+                  <button
+                    aria-label="ミニマップを小さくする"
+                    className="editor-minimapTool"
+                    disabled={miniMapSize === "small"}
+                    onClick={() => adjustMiniMapSize("smaller")}
+                    type="button"
+                  >
+                    -
+                  </button>
+                  <button
+                    aria-label="ミニマップを大きくする"
+                    className="editor-minimapTool"
+                    disabled={miniMapSize === "large"}
+                    onClick={() => adjustMiniMapSize("larger")}
+                    type="button"
+                  >
+                    +
+                  </button>
+                  <button
+                    aria-label="ミニマップを隠す"
+                    className="editor-minimapTool"
+                    onClick={() => setIsMiniMapHidden(true)}
+                    type="button"
+                  >
+                    隠す
+                  </button>
+                </div>
+                <MiniMap
+                  ariaLabel="キャンバス全体マップ"
+                  className="editor-minimap"
+                  maskColor="rgba(31, 26, 19, 0.08)"
+                  nodeBorderRadius={8}
+                  nodeStrokeWidth={2}
+                  onClick={handleMiniMapClick}
+                  onNodeClick={handleMiniMapNodeClick}
+                  pannable
+                  position="bottom-right"
+                  style={currentMiniMapDimensions}
+                  zoomable
+                />
+              </div>
+            )}
           </ReactFlow>
         </div>
 
