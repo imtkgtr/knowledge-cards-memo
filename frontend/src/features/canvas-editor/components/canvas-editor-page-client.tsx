@@ -539,6 +539,18 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
   }, [document?.cards, searchQuery]);
   const canUndo = historyIndex >= 0;
   const canRedo = historyIndex < history.length - 1;
+  const paletteStatusLabel =
+    activeMode === "addHierarchyLink"
+      ? pendingLinkSourceId
+        ? `親: ${findCardLabel(document ?? null, pendingLinkSourceId)}`
+        : "親カードを選択"
+      : activeMode === "toggleCardLock"
+        ? "ロック"
+        : activeMode === "deleteCard"
+          ? "削除"
+          : activeMode === "paintColor" && paintColor
+            ? "色を適用"
+            : null;
   const saveStatusLabel =
     saveState === "saving"
       ? "自動保存中..."
@@ -1948,22 +1960,8 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                   </button>
                 </div>
               </div>
-              {activeMode === "addHierarchyLink" ? (
-                <p className="muted editor-palette__hint">
-                  起点:{" "}
-                  {pendingLinkSourceId
-                    ? findCardLabel(document ?? null, pendingLinkSourceId)
-                    : "カードを選択"}
-                </p>
-              ) : null}
-              {activeMode === "toggleCardLock" ? (
-                <p className="muted editor-palette__hint">ロックモード: カードをクリック</p>
-              ) : null}
-              {activeMode === "deleteCard" ? (
-                <p className="muted editor-palette__hint">削除モード: カードをクリック</p>
-              ) : null}
-              {activeMode === "paintColor" && paintColor ? (
-                <p className="muted editor-palette__hint">色モード: カードをクリック</p>
+              {paletteStatusLabel ? (
+                <output className="editor-palette__status">{paletteStatusLabel}</output>
               ) : null}
               <button
                 aria-label="ツールを隠す"
@@ -2175,8 +2173,8 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                 <section className="detail-links">
                   <h3>添付</h3>
                   <label className="detail-attachmentDropzone">
-                    <strong>{isAttachmentPending ? "添付中..." : "ファイルを添付"}</strong>
-                    <span>画像、PDF、TXT</span>
+                    <strong>{isAttachmentPending ? "添付中..." : "添付"}</strong>
+                    <span>画像 / PDF / TXT</span>
                     <input
                       accept="image/png,image/jpeg,image/webp,application/pdf,text/plain,.txt"
                       className="detail-attachmentInput"
@@ -2250,7 +2248,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                     隠す
                   </button>
                 </div>
-                <p className="muted">操作は上部バーに表示されます。</p>
               </div>
             ) : (
               <div className="detail-panel detail-panel--empty">
@@ -2265,7 +2262,6 @@ export function CanvasEditorPageClient({ initialDocument }: CanvasEditorPageClie
                     隠す
                   </button>
                 </div>
-                <p className="muted">カードを選択すると表示されます。</p>
               </div>
             )}
           </aside>

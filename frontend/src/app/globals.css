@@ -89,7 +89,7 @@ select {
   min-height: 44px;
   padding: 0 18px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 12px;
   background: var(--surface-strong);
   color: var(--text);
   cursor: pointer;
@@ -145,7 +145,7 @@ select {
   min-height: 48px;
   padding: 0 14px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.9);
 }
 
@@ -211,9 +211,9 @@ select {
 
 .editor-shell {
   min-height: 100vh;
-  padding: 12px;
+  padding: 8px;
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .editor-topbar {
@@ -221,9 +221,9 @@ select {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 18px;
+  padding: 12px 14px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow);
 }
@@ -309,7 +309,7 @@ select {
   gap: 8px;
   padding: 10px;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 10px;
   background: var(--surface-strong);
   box-shadow: var(--shadow);
 }
@@ -344,9 +344,9 @@ select {
 .selection-toolbar {
   display: grid;
   gap: 12px;
-  padding: 16px 18px;
+  padding: 12px 14px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow);
 }
@@ -369,24 +369,30 @@ select {
   display: grid;
   align-content: start;
   gap: 12px;
-  padding: 12px 12px 10px;
-  border-radius: 14px;
+  padding: 10px 10px 8px;
+  border-radius: 8px;
 }
 
-.editor-palette__hint {
+.editor-palette__status {
   margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.5;
+  padding: 4px 8px;
+  border: 1px solid rgba(20, 92, 98, 0.18);
+  border-radius: 999px;
+  background: rgba(20, 92, 98, 0.08);
+  color: var(--accent);
+  font-size: 0.82rem;
+  line-height: 1.4;
   overflow-wrap: anywhere;
+  justify-self: start;
 }
 
 .editor-palette--floating {
   position: absolute;
-  top: 16px;
-  left: 16px;
+  top: 12px;
+  left: 12px;
   z-index: 6;
   cursor: ew-resize;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(10px);
 }
 
 .editor-palette__floatingMain {
@@ -397,8 +403,8 @@ select {
 .editor-palette--wide {
   display: flex;
   align-items: center;
-  gap: 14px;
-  border-radius: 14px;
+  gap: 12px;
+  border-radius: 8px;
 }
 
 .editor-palette--wide .editor-palette__floatingMain {
@@ -427,11 +433,6 @@ select {
   justify-content: flex-start;
 }
 
-.editor-palette--wide .editor-palette__hint {
-  margin: 0;
-  white-space: nowrap;
-}
-
 .editor-panelToggle {
   position: absolute;
   z-index: 6;
@@ -441,7 +442,7 @@ select {
   width: 48px;
   height: 48px;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: var(--shadow);
   color: var(--text);
@@ -462,7 +463,7 @@ select {
   height: 44px;
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.82);
   color: var(--text);
   cursor: pointer;
@@ -569,7 +570,7 @@ select {
   position: relative;
   min-height: calc(100vh - 140px);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 6px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.86);
   box-shadow: var(--shadow);
@@ -589,10 +590,10 @@ select {
 }
 
 .editor-detail {
-  padding: 16px 16px 16px 18px;
+  padding: 12px 12px 12px 14px;
   overflow: visible;
   min-width: 0;
-  border-radius: 12px;
+  border-radius: 6px;
   cursor: ew-resize;
 }
 
@@ -719,7 +720,7 @@ select {
   min-height: 180px;
   padding: 16px 18px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.92);
   overflow: auto;
 }
@@ -863,7 +864,7 @@ select {
   width: 100%;
   padding: 14px 16px;
   border: 1px dashed rgba(20, 92, 98, 0.26);
-  border-radius: 12px;
+  border-radius: 8px;
   background: rgba(20, 92, 98, 0.04);
   color: var(--text);
   cursor: pointer;
