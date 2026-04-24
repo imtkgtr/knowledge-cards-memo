@@ -1025,19 +1025,24 @@ select {
 
 .canvas-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 320px));
+  justify-content: start;
   gap: 20px;
 }
 
 .canvas-card {
+  min-height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
   border: 1px solid var(--line);
-  border-radius: 26px;
+  border-radius: 14px;
   overflow: hidden;
   background: var(--surface);
   box-shadow: var(--shadow);
 }
 
 .canvas-card--empty {
+  min-height: 220px;
   padding: 24px;
   display: grid;
   gap: 10px;
@@ -1073,12 +1078,38 @@ select {
   color: var(--accent);
   font-weight: 700;
   text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .canvas-card__body {
+  min-height: 172px;
   padding: 18px;
   display: grid;
+  align-content: space-between;
   gap: 16px;
+}
+
+.canvas-card__body > div:first-child {
+  min-height: 64px;
+}
+
+.canvas-card__body h2 {
+  min-height: 3.1rem;
+  line-height: 1.55;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.canvas-card__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.canvas-card__actions .button {
+  width: 100%;
 }
 
 .overlay {
@@ -1164,6 +1195,10 @@ select {
 
   .editor-placeholder {
     grid-template-columns: 1fr;
+  }
+
+  .canvas-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .editor-layout {
